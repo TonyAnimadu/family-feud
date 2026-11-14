@@ -1,0 +1,52 @@
+// Edit your questions here, then commit. Format: ["Question", [["Answer", points], ...]]  (up to 8 answers, highest points first)
+window.FEUD_DATA = {
+ title: "Adult Family Feud",
+ questions: [
+  ["Name something that would make you think your friend is entertaining someone they shouldn't be", [["Secretive with their phone", 34], ["Vague about where they've been", 22], ["Smiling at texts", 16], ["Suddenly always busy", 12], ["Gets defensive", 9], ["Same name keeps coming up", 7]]],
+  ["Name a situation where someone would suddenly start acting brand new", [["New relationship", 30], ["New Money/New Job", 26], ["Around new friend group", 16], ["Got famous on social media", 12], ["Moved to a new city", 9], ["Had a glow up", 7]]],
+  ["Name something that would make a person regret introducing their partner to their friends", [["Partner flirts with the friends/ Friend flirts with partner", 35], ["Friends bring up exes", 22], ["Partner is lowkey ugly", 16], ["Friends don't like them", 12], ["Partner gets too close to a friend", 9], ["Partner is a REALLY SHITTY politics", 6]]],
+  ["Name something people do to hide that they still have feelings for someone", [["Act like their a entirely new person", 39], ["Date someone new", 24], ["Watch their stories without liking", 16], ["Talk shit about them constantly", 12], ["Stay \"just friends\"", 9]]],
+  ["Name a reason someone would suddenly get interested in their friend's dating life", [["Likes the same person", 30], ["Jealous", 22], ["Nosy", 18], ["Dry ass love life", 13], ["Wants to be set up with a friend", 10], ["Worried about them", 7]]],
+  ["Name something that would make you question whether someone is actually into the person they're dating", [["Avoids talking about them", 28], ["Never posts them", 22], ["Still talks to their ex", 18], ["Flirts with others", 14], ["Never plans dates", 11], ["Hasn't introduced them to anyone", 7]]],
+  ["Name something someone would do so their ex knows they're doing better", [["Post on thirst traps social media", 43], ["Hit the gym or glow up", 25], ["Post a new partner", 18], ["Dye/Change their hair", 14]]],
+  ["Name a reason someone would pretend not to recognize somebody in public", [["Chatterbox who doesn't know when to stop", 30], ["It's someone they dated", 24], ["Owe them money", 16], ["You look like a mess", 14], ["Forgot their name", 10], ["Someone they ghosted/ghosted them", 6]]],
+  ["Name something a friend could do that would make you stop telling them your business", [["Gossips about it", 50], ["Judged you (Unfairly)", 20], ["Used it against you", 15], ["Posted about it", 11], ["Never listens", 4]]],
+  ["Name a reason someone would leave a group chat without saying anything", [["Drama or arguing", 33], ["Too many notifications", 26], ["They were being talked about", 17], ["Got left out of plans", 13], ["Fell out with someone", 11]]],
+  ["Name something a friend knows about you that they could use against you", [["Who you've been with", 30], ["An embarrassing story", 24], ["Your crush", 16], ["Things you said about people", 14], ["Your lies", 9], ["Old photos", 7]]],
+  ["Name something embarrassing that can happen on a first date", [["Card declined", 36], ["Food in your teeth", 28], ["Calling them the wrong name", 23], ["Running into your ex", 13]]],
+  ["Name something someone might do when they're jealous of a friend", [["Talk behind their back", 32], ["Backhanded compliments", 24], ["Downplay their wins", 16], ["Always try to outdo them", 12], ["Hide them from friends/partners", 10], ["Gaslight them", 6]]],
+  ["Name a reason someone keeps entertaining someone they claim they don't like", [["Bored", 26], ["Free food or gifts", 24], ["Likes the attention", 20], ["Fine shit", 14], ["Lonely", 10], ["Easy", 6]]],
+  ["Name something that would make you lose interest during a date", [["Rude to the waiter", 32], ["On their phone/Not paying attention", 22], ["Talks about their ex", 18], ["Bad hygiene", 14], ["Only talks about themselves", 9], ["Cheap", 5]]],
+  ["Name something someone might lie about before getting intimate", [["Body count", 40], ["Age", 15], ["Relationship status", 13], ["When they last got tested", 12], ["Job or money", 9], ["Sexual Experience", 7], ["ASSets/Catfishing", 4]]],
+  ["Name something someone might do at a party that gets them uninvited next time", [["Sloppy drunk", 34], ["Starts a fight", 20], ["Flirts with a friend's partner or ex", 18], ["Throws up", 12], ["Overly obssesed with hooking up", 10], ["Drama", 6]]],
+  ["Name a reason someone would suddenly disappear from a party", [["Hooked up", 40], ["Too drunk", 23], ["Saw their ex", 15], ["Bored/Tired", 13], ["Got sick", 9]]],
+  ["Name something you'd never want your parents to see on your phone", [["Pics", 39], ["Texts", 25], ["Search history", 17], ["Dating apps", 13], ["Social Media", 6]]],
+  ["Name something that would make you leave a date without finishing your food", [["Rude", 32], ["Ex walks in", 19], ["Emergency", 17], ["They're married or in a realationship", 15], ["Creepy comments", 11], ["Wandering Eyes", 6]]],
+  ["Name something people do when trying to look unbothered", [["Fake laugh", 26], ["Post on social media", 24], ["Say their fine while steaming about it", 20], ["Silent treatment", 14], ["Dry texts \"ok\" or 👍🏾", 10], ["Quickly switching subjects", 6]]],
+  ["Name something that would make you regret giving someone your number", [["Always texting/Always immediately responds", 32], ["Sends unsolicited pics", 21], ["Always trying to call or be on facetime", 15], ["Actually a cheater", 12], ["Crazy/Bum", 10], ["Dry ass texts", 6], ["Didn't want to but couldn't come up with a lie ", 4]]],
+  ["Name something that would make a person instantly humble", [["Overconfident and learning they were completely wrong", 28], ["Getting dumped", 24], ["Going broke", 20], ["Getting clocked", 15], ["Losing a bet or game", 13]]],
+  ["Name something people think counts as a personality", [["Their zodiac sign", 25], ["The gym/looks", 21], ["Their Job/Money", 15], ["Queer", 13], ["Neurodivergent", 12], ["Sports", 10], ["Media they like", 4]]],
+  ["Name something women notice about a man in the first five minutes", [["How he smells", 30], ["Height", 24], ["Teeth", 16], ["Hair", 14], ["Hands", 10], ["Disposition/Respectfulness", 6]]],
+  ["Name something a woman does when she's done with a man", [["Blocks him", 30], ["Changes her hair", 24], ["Posts a thirst trap", 18], ["Deletes all of their pics", 12], ["Gets her nails done", 10], ["Goes out with the girls", 6]]],
+  ["Name something people lie about on dating apps", [["Height", 42], ["Job", 17], ["Age", 13], ["Being single", 11], ["Old photos", 8], ["Reading ", 4], ["Random Interests", 3], ["\"I'm never on here\"", 2]]],
+  ["Name something women screenshot and send to the group chat", [["His dry texts", 30], ["Dating profile", 24], ["Red flags", 18], ["Corny lines", 14], ["Weak ass no effort texts", 8], ["Unsolicited pics", 6]]],
+  ["Name something a man does to get back in your good graces", [["Sends flowers", 28], ["Tries to take you out to eat", 24], ["Texts \"wyd\"", 18], ["Good morning texts", 14], ["Tries to buy you things", 10], ["Happy Birthday texts", 6]]],
+  ["Name something that happens in the club bathroom", [["Somebody's crying", 28], ["Talking Shit", 22], ["Fixing your fit/hair", 18], ["Taking pictures", 14], ["Making a new random drunk best friend", 10], ["Throwing up/Taking care of someone who did", 8]]],
+  ["Name a question you'll get asked at Thanksgiving or a family event", [["\"When you getting married?\"", 28], ["\"You seeing anybody?\"", 24], ["\"When you having kids?\"", 18], ["\"You still at that job?\"", 12], ["\"You gained weight?\"", 10], ["\"Can you fix my phone?\"", 8]]],
+  ["Name an instant ick", [["Bad Hygiene ", 28], ["Constantly Interrupting", 20], ["Talks down to you", 16], ["Dry Texting", 14], ["Trauma dumping", 12], ["Makes everything sexual", 10]]],
+  ["Name something every household had growing up", [["A plastic tub that essentially became just another container", 30], ["A bag full of bags", 24], ["All purpose Vaseline or VIcks", 16], ["Multipurpose wooden spoon", 12], ["Good plates/Good furniture nobody could use", 10], ["No Shoe rule", 8]]],
+  ["Name something that got you in trouble as a kid", [["Talking back", 38], ["Rolling your eyes", 22], ["Touching the thermostat", 16], ["Going in somebody else's fridge", 9], ["Not greeting family when they come over", 8], ["Stomping away/ Slamming a door", 7]]],
+  ["Name a red flag", [["Still talks to their ex", 27], ["Rude to friends", 21], ["Has no friends", 15], ["Love bombs you", 13], ["Hides their phone", 12], ["Every ex is \"crazy\"", 8], ["\"Retired\" cheater", 4]]],
+  ["Name something only white kids do", [["Wear shoes in the house", 33], ["Talk back to their parents", 27], ["Act fublic", 20], ["Call their parents by first name", 13], ["Kiss their dogs on the mouth", 7]]],
+  ["Name a song that gets white people up at the function", [["Mr. Brightside", 30], ["Sweet Caroline", 26], ["Teenage Dirtbag", 18], ["I Write SIns Not Tragedies", 12], ["Livin' on a Prayer", 10], ["Party in the USA", 4]]],
+  ["Name something that makes a white friend think they're closer to you than they are", [["A Black Relative/Friend", 32], ["They know every word to a Kendrick, Drake, Gambino, Travis, etc. Song", 26], ["They have white guilt/\"not like the other yts\"", 21], ["They told you they're neurodivergent/Queer", 12], ["Obsessed with black history and culture", 9]]]
+ ],
+ // Fast Money: 5 questions. The host types the players' answers and points live.
+ fastMoney: [
+  "Name something someone does to look single when they're out without their partner",
+  "Name something someone does after realizing the person they're flirting with knows their ex",
+  "Name something that makes a friend group turn on one person",
+  "Name something that makes you think two people in your friend group hooked up",
+  "Name something that makes you rethink a friendship after a weekend trip"
+ ]
+};
