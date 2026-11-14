@@ -186,6 +186,12 @@ input.txt{width:100%;padding:14px;border-radius:10px;border:2px solid #2f7cf6;ba
 .fmCell .pp{width:64px}
 .fmCell .row{margin:0}
 .fmCell button{padding:6px 10px;font-size:13px}
+.sndList{display:flex;flex-direction:column;gap:6px}
+.sndRow{display:flex;align-items:center;gap:8px;background:#071a4d;border:1px solid #2a4f9c;border-radius:10px;padding:8px 10px;text-align:left}
+.sndRow .sl{flex:1;font-size:16px}.sndRow .sf{font-size:12px;color:#9fb6e8;word-break:break-all}
+.sndLoad{cursor:pointer;display:inline-block}
+.sndModal{position:fixed;inset:0;z-index:70;background:rgba(2,6,20,.92);display:flex;align-items:center;justify-content:center;padding:20px}
+.sndModal .panel{max-width:620px;width:100%;max-height:90vh;overflow:auto}
 kbd{background:#26314f;border-radius:4px;padding:1px 6px;font-family:inherit}
 </style>
 </head>
@@ -263,8 +269,49 @@ const SFX = (()=>{
       [72,76,79,84].forEach(m=>tone(hz(m),t+14*b,2.2*b,{type:'triangle',vol:.1,release:2.2*b}));
     }
   };
-  return {unlock:ac, play:n=>{ try{ lib[n]&&lib[n](); }catch(e){} }};
+  const custom={}, playing=new Set();
+  function playCustom(n){ const url=custom[n]; if(!url) return false; const a=new Audio(url); playing.add(a); a.onended=()=>playing.delete(a); a.play().catch(()=>{}); return true; }
+  function stopAll(){ playing.forEach(a=>{ try{a.pause()}catch(e){} }); playing.clear(); }
+  return {unlock:ac, custom, stopAll, play:n=>{
+    if(n==='stop'){ stopAll(); return; }
+    if(playCustom(n)) return;
+    if(n==='timeup' && playCustom('strike')) return;
+    try{ lib[n]&&lib[n](); }catch(e){} }};
 })();
+
+/* ================= CUSTOM SOUNDS (stored only in this browser) ================= */
+const SOUND_SLOTS=[['theme','Theme song'],['ding','Correct answer'],['strike','Strike buzzer'],['buzz','Buzz-in'],['win','Points awarded'],['applause','Applause'],['zero','Fast Money zero / duplicate'],['timeup','Fast Money time up']];
+const SoundStore=(()=>{
+  let dbp=null, names={}; const bc=('BroadcastChannel' in window)?new BroadcastChannel('ff-sounds'):null; const api={onchange:null};
+  function db(){ if(!dbp) dbp=new Promise((res,rej)=>{ try{ const r=indexedDB.open('ff-sounds',1); r.onupgradeneeded=()=>r.result.createObjectStore('s'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }catch(e){ rej(e); } }); return dbp; }
+  async function load(){
+    try{ const d=await db(); await new Promise(res=>{ const t=d.transaction('s','readonly'), st=t.objectStore('s'), rk=st.getAllKeys(), rv=st.getAll();
+      t.oncomplete=()=>{ Object.keys(SFX.custom).forEach(k=>{ URL.revokeObjectURL(SFX.custom[k]); delete SFX.custom[k]; }); names={};
+        rk.result.forEach((k,i)=>{ SFX.custom[k]=URL.createObjectURL(rv.result[i].blob); names[k]=rv.result[i].name; }); res(); };
+      t.onerror=()=>res(); }); }catch(e){}
+    if(api.onchange) api.onchange(); return names;
+  }
+  async function write(fn){ const d=await db(); await new Promise((res,rej)=>{ const t=d.transaction('s','readwrite'); fn(t.objectStore('s')); t.oncomplete=res; t.onerror=()=>rej(t.error); }); await load(); if(bc) bc.postMessage('reload'); }
+  if(bc) bc.onmessage=()=>load();
+  api.load=load; api.names=()=>names;
+  api.set=(k,file)=>write(st=>st.put({blob:file,name:file.name},k));
+  api.del=k=>write(st=>st.delete(k));
+  return api;
+})();
+SoundStore.load();
+function soundPanelHTML(){
+  const nm=SoundStore.names();
+  return '<div class="sndList">'+SOUND_SLOTS.map(([k,l])=>'<div class="sndRow"><div class="sl">'+esc(l)+'<div class="sf">'+(nm[k]?'♪ '+esc(nm[k]):'Built-in sound')+'</div></div>'+
+    '<label class="hBtn gold sndLoad">Load file<input type="file" accept="audio/*" data-snd="'+k+'" hidden></label>'+
+    '<button class="hBtn gray" data-sndtest="'+k+'">▶ Test</button>'+(nm[k]?'<button class="hBtn gray" data-sndreset="'+k+'">Reset</button>':'')+'</div>').join('')+'</div>'+
+    '<div class="small" style="margin-top:8px">Files stay in this browser only and are never uploaded. A TV display open in this same browser uses them too. A TV on a different device needs its own files, loaded from the display\'s start screen.</div>';
+}
+function wireSoundPanel(container,rerender){
+  container.addEventListener('change',e=>{ const t=e.target; if(t.dataset&&t.dataset.snd&&t.files&&t.files[0]) SoundStore.set(t.dataset.snd,t.files[0]).then(rerender); });
+  container.addEventListener('click',e=>{ const t=e.target.closest('[data-sndtest],[data-sndreset]'); if(!t) return; e.stopPropagation();
+    if(t.dataset.sndtest){ SFX.unlock(); SFX.stopAll(); SFX.play(t.dataset.sndtest); }
+    if(t.dataset.sndreset) SoundStore.del(t.dataset.sndreset).then(rerender); });
+}
 
 /* ================= QR ================= */
 function qrSVG(text){ try{ const q=qrcode(0,'M'); q.addData(text); q.make(); return q.createSvgTag({cellSize:4,margin:0,scalable:true}); }catch(e){ return ''; } }
@@ -319,7 +366,10 @@ function initDisplay(code){
   const root=$('#display'); root.classList.remove('hidden');
   let S=null, prevSlots=[], prevStrikeTs=0, prevBuzzTs=0, audioOn=false, lastScreen='', primed=false;
   const joinURL=baseURL+'?join='+code;
-  root.innerHTML='<div class="connDot" id="dConn">connecting…</div><div id="dMain" style="width:100%;display:flex;justify-content:center"></div><div id="dOverlay"></div><div class="startOverlay" id="dStart"><div class="logo"><div class="l1">'+esc((DATA.title||'').replace(/family feud/i,'').trim()||'THE')+'</div><div class="l2">FAMILY<br>FEUD</div></div><h2>CLICK ANYWHERE TO START THE SHOW</h2><div class="muted">Turns on sound and full screen</div></div>';
+  root.innerHTML='<div class="connDot" id="dConn">connecting…</div><div id="dMain" style="width:100%;display:flex;justify-content:center"></div><div id="dOverlay"></div><div class="startOverlay" id="dStart"><div class="logo"><div class="l1">'+esc((DATA.title||'').replace(/family feud/i,'').trim()||'THE')+'</div><div class="l2">FAMILY<br>FEUD</div></div><h2>CLICK ANYWHERE TO START THE SHOW</h2><div class="muted">Turns on sound and full screen</div><button class="hBtn gray" id="dSnd" style="margin-top:10px">Custom sounds for this screen</button></div>';
+  $('#dSnd').onclick=e=>{ e.stopPropagation(); const m=document.createElement('div'); m.className='sndModal';
+    const draw=()=>{ m.innerHTML='<div class="panel"><h3>Custom sounds <button class="hBtn gray" data-close="1">Close</button></h3>'+soundPanelHTML()+'</div>'; };
+    draw(); wireSoundPanel(m,draw); m.addEventListener('click',ev=>{ ev.stopPropagation(); if(ev.target.dataset.close) m.remove(); }); document.body.appendChild(m); };
   $('#dStart').onclick=()=>{ SFX.unlock(); audioOn=true; $('#dStart').remove(); try{document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}catch(e){} };
   const net=connectClient(code,()=>({t:'hello',role:'display'}),msg=>{
     if(msg.t==='state'){ S=msg.s; if(!primed){ primed=true; prevStrikeTs=S.strike?S.strike.ts:0; prevBuzzTs=S.buzz&&S.buzz.first?S.buzz.ts:0; } render(); }
@@ -562,7 +612,7 @@ function initHost(){
     '</div>'+
     '<div class="row"><b class="small" style="margin-right:4px">SCREEN</b>'+
       ['title','board','fm'].map(s=>'<button class="hBtn '+(G.screen===s?'gold':'gray')+'" data-a="screen" data-v="'+s+'">'+({title:'Title + QR',board:'Main game',fm:'Fast Money'})[s]+'</button>').join('')+
-      '<button class="hBtn gray" data-a="theme">♪ Theme</button><button class="hBtn gray" data-a="applause">👏 Applause</button>'+
+      '<button class="hBtn gray" data-a="theme">♪ Theme</button><button class="hBtn gray" data-a="stopsnd">■ Stop sound</button><button class="hBtn gray" data-a="applause">👏 Applause</button>'+
       '<button class="hBtn gray '+(G.showQR?'on':'')+'" data-a="qr">Corner QR: '+(G.showQR?'on':'off')+'</button>'+
       '<button class="hBtn gray" data-a="newgame">New game</button></div>'+
     '<div class="row">'+[0,1].map(t=>'<div class="hTeam '+(t?'t2':'')+'"><input data-f="tn'+t+'" data-tn="'+t+'" value="'+esc(G.teams[t].name)+'"><div class="s">'+G.teams[t].score+'</div>'+
@@ -570,7 +620,8 @@ function initHost(){
     (G.screen==='fm'? fmPanel() : mainPanels(q))+
     '<div class="panel" style="margin-top:14px"><h3>Players <span class="small">'+players.length+'</span></h3><div class="plist">'+
       (players.length? [0,1].map(t=>'<div><b>'+esc(G.teams[t].name)+':</b> '+(players.filter(p=>p.team===t).map(p=>esc(p.name||'?')).join(', ')||'—')+'</div>').join('') : 'Nobody yet. Put the Title screen on the TV so people can scan the QR.')+
-      '</div><div class="small" style="margin-top:8px">Join link: '+esc(joinURL)+'</div><div class="small">Shortcuts: <kbd>A</kbd> Team 1 buzz · <kbd>L</kbd> Team 2 buzz · <kbd>1</kbd>–<kbd>8</kbd> reveal · <kbd>X</kbd> strike</div></div>';
+      '</div><div class="small" style="margin-top:8px">Join link: '+esc(joinURL)+'</div><div class="small">Shortcuts: <kbd>A</kbd> Team 1 buzz · <kbd>L</kbd> Team 2 buzz · <kbd>1</kbd>–<kbd>8</kbd> reveal · <kbd>X</kbd> strike</div></div>'+
+    '<div class="panel" style="margin-top:14px" id="hSnd"><h3>Custom sounds</h3>'+soundPanelHTML()+'</div>';
     if(focus){ const el=root.querySelector('[data-f="'+focus+'"]'); if(el){ el.focus(); try{ const v=el.value; el.setSelectionRange(v.length,v.length);}catch(e){} } }
   }
   function mainPanels(q){
@@ -613,7 +664,7 @@ function initHost(){
       case 'mult': A.mult(+v); break; case 'hideq': G.hideQ=!G.hideQ; broadcast(); break;
       case 'openbuzz': A.openBuzz(); break; case 'lockbuzz': A.lockBuzz(); break; case 'resetbuzz': A.resetBuzz(); break;
       case 'screen': if(v==='board' && G.screen!=='board' && !Q[G.qi]) return; A.screen(v); break;
-      case 'theme': A.theme(); break; case 'applause': A.applause(); break; case 'qr': G.showQR=!G.showQR; broadcast(); break;
+      case 'theme': A.theme(); break; case 'stopsnd': sfx('stop'); break; case 'applause': A.applause(); break; case 'qr': G.showQR=!G.showQR; broadcast(); break;
       case 'hostsound': G.hostSound=!G.hostSound; save(); render(); break;
       case 'newgame': A.newGame(); break;
       case 'copyjoin': try{ navigator.clipboard.writeText(baseURL+'?join='+G.code).then(()=>flash('Join link copied')); }catch(x){ flash(baseURL+'?join='+G.code); } break;
@@ -639,6 +690,7 @@ function initHost(){
   // heartbeat so late/dropped clients stay in sync
   setInterval(()=>{ const m={t:'state',s:pub()}; conns.forEach(c=>{ if(c.conn.open) try{c.conn.send(m)}catch(e){} }); },4000);
 
+  wireSoundPanel(root,()=>render()); SoundStore.onchange=()=>render();
   render(); startPeer();
 }
 })();
