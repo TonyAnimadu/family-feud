@@ -6,9 +6,11 @@
 <meta name="theme-color" content="#0a1838">
 <title>Family Feud</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:ital,wght@0,500;0,600;0,700;0,800;0,900;1,900&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script src="questions.js?v=14"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:ital,wght@0,500;0,600;0,700;0,800;0,900;1,900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link rel="dns-prefetch" href="https://broker.emqx.io"><link rel="dns-prefetch" href="https://public.cloud.shiftr.io"><link rel="dns-prefetch" href="https://test.mosquitto.org"><link rel="dns-prefetch" href="https://broker.hivemq.com">
+<script>/* only the TV needs the QR code library; phones skip it so they load faster */ if(/[?&]display=/.test(location.search)) document.write('<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"><\/script>');</script>
+<script src="questions.js?v=15"></script>
 <style>
 /* ---------- palette: navy base, royal blue tiles, warm gold accent (complement), team blue vs coral ---------- */
 :root{
@@ -393,7 +395,8 @@ function qrSVG(text){ try{ const q=qrcode(0,'M'); q.addData(text); q.make(); ret
    Every screen talks through three free public relay servers at once (MQTT over secure WebSockets).
    Messages go out on all three and duplicates are dropped, so one slow or blocked server never breaks the game.
    The host keeps the latest game state "retained" on each server, so a phone gets it the instant it connects. */
-const BROKERS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt'];
+// [url, username, password]. shiftr.io runs on port 443, which almost every Wi-Fi network allows.
+const BROKERS=[['wss://broker.emqx.io:8084/mqtt'],['wss://public.cloud.shiftr.io:443','public','public'],['wss://test.mosquitto.org:8081/mqtt'],['wss://broker.hivemq.com:8884/mqtt']];
 const rid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 function mqttLink(url,o){
   const enc=new TextEncoder(), dec=new TextDecoder();
@@ -412,7 +415,7 @@ function mqttLink(url,o){
     try{ ws=new WebSocket(url,['mqtt']); }catch(e){ retry(); return; }
     ws.binaryType='arraybuffer';
     const me=ws, guard=setTimeout(()=>{ if(me===ws&&!up) retry(true); },8000);
-    ws.onopen=()=>{ lastIn=Date.now(); send(pkt(1,0,cat(str('MQTT'),new Uint8Array([4,2,0,30]),str(o.clientId)))); };
+    ws.onopen=()=>{ lastIn=Date.now(); send(o.user?pkt(1,0,cat(str('MQTT'),new Uint8Array([4,0xC2,0,20]),str(o.clientId),str(o.user),str(o.pass||''))):pkt(1,0,cat(str('MQTT'),new Uint8Array([4,2,0,20]),str(o.clientId)))); };
     ws.onmessage=e=>{ lastIn=Date.now(); buf=cat(buf,new Uint8Array(e.data)); parse(); };
     ws.onclose=ws.onerror=()=>{ clearTimeout(guard); if(me===ws){ setUp(false); retry(); } };
   }
@@ -428,19 +431,19 @@ function mqttLink(url,o){
     }
   }
   function retry(now){ setUp(false); if(closed||rtimer) return; try{ ws&&ws.close(); }catch(e){} rtimer=setTimeout(open,now?300:backoff); backoff=Math.min(10000,backoff*1.8); }
-  ping=setInterval(()=>{ if(!up) return; if(Date.now()-lastIn>50000){ retry(true); return; } send(new Uint8Array([0xC0,0])); },20000);
+  ping=setInterval(()=>{ if(!up) return; if(Date.now()-lastIn>25000){ retry(true); return; } send(new Uint8Array([0xC0,0])); },10000);
   open();
   return {
     up:()=>up,
     publish(topic,text,retain){ if(!up) return false; return send(pkt(3,retain?1:0,cat(str(topic),enc.encode(text)))); },
-    kick(){ if(!up){ clearTimeout(rtimer); rtimer=null; open(); } },
+    kick(){ if(!up||Date.now()-lastIn>12000){ clearTimeout(rtimer); rtimer=null; backoff=800; setUp(false); open(); } else send(new Uint8Array([0xC0,0])); },
     close(){ closed=true; clearInterval(ping); try{ ws&&ws.close(); }catch(e){} }
   };
 }
 /* role-aware bus over all brokers: send(channel,msg,retain), dedupe by msg.id */
 function createBus(code,subs,onMsg,onStatus,onUp){
   const base='ffta1/'+code+'/', seen=new Map(), cid=rid();
-  const links=BROKERS.map((url,i)=>mqttLink(url,{clientId:'ff-'+cid+'-'+i,subs:subs.map(s=>base+s),
+  const links=BROKERS.map(([url,user,pass],i)=>mqttLink(url,{clientId:'ff-'+cid+'-'+i,user,pass,subs:subs.map(s=>base+s),
     onMessage:(t,txt)=>{ let m; try{ m=JSON.parse(txt); }catch(e){ return; } if(!m) return;
       if(m.id){ if(seen.has(m.id)) return; seen.set(m.id,Date.now()); if(seen.size>400){ const cut=Date.now()-60000; seen.forEach((v,k)=>{ if(v<cut) seen.delete(k); }); } }
       onMsg(t.slice(base.length),m); },
@@ -648,13 +651,14 @@ function initPlayer(code){
     else if($('.teamPick')){ const bs=root.querySelectorAll('.teamPick button'); bs[0].textContent=S.teams[0].name; bs[1].textContent=S.teams[1].name; }
     updConn();
   }
-  const bus=createBus(code,['h','y/'+me.pid],(ch,m)=>{
+  const bus=createBus(code,['p','y/'+me.pid],(ch,m)=>{
     if(m.t==='state') onState(m.s);
     if(m.t==='you'){ me.name=m.name; me.team=m.team; if(m.joined===false){ me.joined=false; save(); joinView(); return; } me.joined=true; save(); if(!$('#pBuzz')) playView(); else renderPlay(); }
   },n=>{ up=n; updConn(); },()=>bus.send('c',hello()));
   setInterval(()=>{ bus.send('c',hello('hb')); updConn(); },5000);
   if(me.joined) playView(); else joinView();
   document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ bus.kick(); keepAwake(); bus.send('c',hello()); } });
+  addEventListener('focus',()=>bus.kick());
   addEventListener('online',()=>bus.kick());
   addEventListener('pageshow',()=>bus.kick());
 }
@@ -698,7 +702,10 @@ function initHost(){
   const presence=new Map(); // 'p:pid' | 'd:cid' -> {role,pid,t}
   const bcLive=('BroadcastChannel' in window)?new BroadcastChannel('ff-live-'+G.code):null; let localTV=0;
   function stateMsg(){ const s=pub(); s.seq=nextSeq(); return {t:'state',s}; }
-  function publishState(){ if(pubT) return; pubT=setTimeout(()=>{ pubT=null; const m=stateMsg(); bus.send('h',m,true); if(bcLive) try{bcLive.postMessage(m)}catch(e){} },15); }
+  /* phones get a small state with only what they show, so updates stay tiny on cell data */
+  function phoneMsg(s){ const R=s.round; return {t:'state',s:{seq:s.seq,screen:s.screen,teams:s.teams.map(t=>({name:t.name,score:t.score})),control:s.control,buzz:s.buzz,
+    round:{q:R.hideQ?'':R.q,hideQ:R.hideQ,phase:R.phase,stealTeam:R.stealTeam,foWinner:R.foWinner}}}; }
+  function publishState(){ if(pubT) return; pubT=setTimeout(()=>{ pubT=null; const m=stateMsg(); bus.send('h',m,true); bus.send('p',phoneMsg(m.s),true); if(bcLive) try{bcLive.postMessage(m)}catch(e){} },15); }
   if(bcLive) bcLive.onmessage=e=>{ const d=e.data||{}; if(d.t==='hello'&&d.role==='display'){ const was=Date.now()-localTV<9000; localTV=Date.now(); try{bcLive.postMessage(stateMsg())}catch(x){} if(!was) render(); } };
   const bus=createBus(G.code,['c'],(ch,m)=>onMsg(m),n=>{ netUp=n; setNet(); },()=>publishState());
   let lastScr=G.screen;

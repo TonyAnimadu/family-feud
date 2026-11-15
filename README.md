@@ -27,4 +27,4 @@ Edit `questions.js` on GitHub and commit. The site updates in about a minute.
 
 ## How phones connect
 
-The host, TV and phones talk through three free public relay servers at the same time (EMQX, HiveMQ and Mosquitto, over secure WebSockets). Every message goes out on all three, so the game keeps working if one is slow or down. The latest game state stays on the servers, so a phone that reconnects or reloads catches up instantly. Phones also keep their screen awake while playing.
+The host, TV and phones talk through four free public relay servers at the same time (EMQX, shiftr.io, Mosquitto and HiveMQ, over secure WebSockets). shiftr.io runs on port 443, which almost every Wi-Fi network allows. Every message goes out on all four, so the game keeps working if one is slow, down or blocked. Phones get a small update with only what they show, and a connection that goes quiet after a phone sleeps or switches networks is replaced within seconds. The latest game state stays on the servers, so a phone that reconnects or reloads catches up instantly. Phones also keep their screen awake while playing.
