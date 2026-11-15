@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:ital,wght@0,500;0,600;0,700;0,800;0,900;1,900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script src="questions.js?v=12"></script>
+<script src="questions.js?v=13"></script>
 <style>
 /* ---------- palette: navy base, royal blue tiles, warm gold accent (complement), team blue vs coral ---------- */
 :root{
@@ -188,6 +188,7 @@ body.phone .stage{--rayY:58%}
 .hBtn.on{border-color:var(--gold);color:var(--gold-hi)}
 .hBtn.sel{background:var(--gold);color:#2a1a00;border-color:transparent}
 .hBar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px}
+.sndBar{gap:6px 10px;margin-top:-6px}.sndCtl{display:inline-flex;align-items:center;gap:3px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px 4px 3px 10px}.sndName{font-size:12px;font-weight:700;color:var(--muted);margin-right:4px;white-space:nowrap}.hBtn.sm{padding:5px 8px;font-size:12px;min-width:30px;justify-content:center}
 .hBar .lab{font-size:12px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-right:4px;font-weight:700}
 .hTeams{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
 .hGrid{display:grid;grid-template-columns:minmax(300px,1fr) minmax(340px,1.25fr);gap:14px}
@@ -271,16 +272,16 @@ const params = new URLSearchParams(location.search);
 const logoHTML = (w)=>'<div class="logo" style="--lw:'+w+'"><div class="lt">FAMILY<br>FEUD</div></div>';
 /* ================= SOUND (original, synthesized) ================= */
 const SFX = (()=>{
-  let ctx=null, master=null;
+  let ctx=null, master=null, curDest=null; const synth={};
   function ac(){ if(!ctx){ const C=window.AudioContext||window.webkitAudioContext; if(!C) return null; ctx=new C(); master=ctx.createGain(); master.gain.value=.7; master.connect(ctx.destination);} if(ctx.state==='suspended') ctx.resume(); return ctx; }
   function tone(f,t0,dur,{type='sine',vol=.3,attack=.005,release=null,detune=0,filter=null,dest=null}={}){
     const c=ac(); if(!c) return; const o=c.createOscillator(), g=c.createGain(); o.type=type; o.frequency.setValueAtTime(f,t0); o.detune.value=detune;
     g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(vol,t0+attack); g.gain.exponentialRampToValueAtTime(.0001,t0+(release??dur));
     let n=o; if(filter){const fl=c.createBiquadFilter(); fl.type='lowpass'; fl.frequency.value=filter; o.connect(fl); n=fl;}
-    n.connect(g); g.connect(dest||master); o.start(t0); o.stop(t0+(release??dur)+.05);
+    n.connect(g); g.connect(dest||curDest||master); o.start(t0); o.stop(t0+(release??dur)+.05);
   }
   function noise(t0,dur,vol=.2,hp=1500){ const c=ac(); if(!c) return; const b=c.createBuffer(1,c.sampleRate*dur,c.sampleRate), d=b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
-    const s=c.createBufferSource(); s.buffer=b; const f=c.createBiquadFilter(); f.type='highpass'; f.frequency.value=hp; const g=c.createGain(); g.gain.setValueAtTime(vol,t0); g.gain.exponentialRampToValueAtTime(.0001,t0+dur); s.connect(f); f.connect(g); g.connect(master); s.start(t0); }
+    const s=c.createBufferSource(); s.buffer=b; const f=c.createBiquadFilter(); f.type='highpass'; f.frequency.value=hp; const g=c.createGain(); g.gain.setValueAtTime(vol,t0); g.gain.exponentialRampToValueAtTime(.0001,t0+dur); s.connect(f); f.connect(g); g.connect(curDest||master); s.start(t0); }
   const now=()=>{const c=ac(); return c?c.currentTime+.02:0};
   const lib={
     ding(){ const t=now(); [1318.5,1975.5,2637].forEach((f,i)=>tone(f,t,1.6,{vol:[.35,.18,.08][i]})); [1318.5,1975.5].forEach((f,i)=>tone(f,t+.16,1.4,{vol:[.25,.12][i]})); },
@@ -310,13 +311,24 @@ const SFX = (()=>{
     }
   };
   const custom={}, playing=new Set();
-  function playCustom(n){ const url=custom[n]; if(!url) return false; const a=new Audio(url); playing.add(a); a.onended=()=>playing.delete(a); a.play().catch(()=>{}); return true; }
-  function stopAll(){ playing.forEach(a=>{ try{a.pause()}catch(e){} }); playing.clear(); }
-  return {unlock:ac, custom, stopAll, play:n=>{
+  const inst=n=>[...playing].filter(a=>a._n===n);
+  const cut=n=>{ (synth[n]||[]).forEach(g=>{ try{g.disconnect()}catch(e){} }); synth[n]=[]; };
+  function stop(n){ inst(n).forEach(a=>{ try{a.pause()}catch(e){} playing.delete(a); }); cut(n); }
+  function pause(n){ inst(n).forEach(a=>{ try{a.pause()}catch(e){} a._paused=true; }); cut(n); }
+  function resume(n){ const L=inst(n).filter(a=>a._paused); L.forEach(a=>{ a._paused=false; a.play().catch(()=>{}); }); return L.length>0; }
+  function playCustom(n,loop,as){ const url=custom[n]; if(!url) return false; const a=new Audio(url); a._n=as||n; a.loop=!!loop; playing.add(a); a.onended=()=>playing.delete(a); a.play().catch(()=>{}); return true; }
+  function playSynth(n){ const c=ac(); if(!c||!lib[n]) return; const g=c.createGain(); g.connect(master); curDest=g; try{ lib[n](); }catch(e){} curDest=null; (synth[n]=synth[n]||[]).push(g); setTimeout(()=>{ const L=synth[n]||[], i=L.indexOf(g); if(i>=0) L.splice(i,1); },20000); }
+  function stopAll(){ playing.forEach(a=>{ try{a.pause()}catch(e){} }); playing.clear(); Object.keys(synth).forEach(cut); }
+  function play(n,loop){
     if(n==='stop'){ stopAll(); return; }
-    if(playCustom(n)) return;
-    if(n==='timeup' && playCustom('strike')) return;
-    try{ lib[n]&&lib[n](); }catch(e){} }};
+    if(resume(n)) return;
+    stop(n);
+    if(playCustom(n,loop)) return;
+    if(n==='timeup' && playCustom('strike',false,'timeup')) return;
+    playSynth(n);
+  }
+  function cmd(m){ if(!m||!m.n) return; if(m.op==='pause') pause(m.n); else if(m.op==='stop') stop(m.n); else play(m.n,m.loop); }
+  return {unlock:ac, custom, stopAll, play, cmd, pause, stop};
 })();
 
 /* ================= CUSTOM SOUNDS (stored only in this browser) ================= */
@@ -440,11 +452,11 @@ function initDisplay(code){
   $('#dSnd').onclick=e=>{ e.stopPropagation(); const m=document.createElement('div'); m.className='sndModal';
     const draw=()=>{ m.innerHTML='<div class="panel"><h3>Custom sounds <button class="hBtn" data-close="1">Close</button></h3>'+soundPanelHTML()+'</div>'; };
     draw(); wireSoundPanel(m,draw); m.addEventListener('click',ev=>{ ev.stopPropagation(); if(ev.target.dataset.close) m.remove(); }); document.body.appendChild(m); };
-  $('#dStart').onclick=()=>{ SFX.unlock(); audioOn=true; $('#dStart').remove(); try{ const p=document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen(); if(p&&p.catch) p.catch(()=>{}); }catch(e){} };
+  $('#dStart').onclick=()=>{ SFX.unlock(); audioOn=true; $('#dStart').remove(); if(S&&S.screen==='title'&&S.introTheme) SFX.cmd({n:'theme',loop:true}); try{ const p=document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen(); if(p&&p.catch) p.catch(()=>{}); }catch(e){} };
   const seenSfx=[]; let netSt='connecting', lastLocal=0; const cid=Math.random().toString(36).slice(2,10);
   const onMsg=msg=>{
     if(msg.t==='state'){ S=msg.s; if(!primed){ primed=true; prevStrikeTs=S.strike?S.strike.ts:0; prevBuzzTs=S.buzz&&S.buzz.first?S.buzz.ts:0; } render(); }
-    if(msg.t==='sfx'){ if(msg.id){ if(seenSfx.includes(msg.id)) return; seenSfx.push(msg.id); if(seenSfx.length>60) seenSfx.shift(); } if(audioOn) SFX.play(msg.n); }
+    if(msg.t==='sfx'){ if(msg.id){ if(seenSfx.includes(msg.id)) return; seenSfx.push(msg.id); if(seenSfx.length>60) seenSfx.shift(); } if(audioOn) SFX.cmd(msg); }
   };
   const showConn=()=>{ const d=$('#dConn'); if(!d) return; const local=Date.now()-lastLocal<9000;
     d.textContent= netSt==='connected'?'● live':local?'● live (this laptop)':netSt==='nohost'?'waiting for host…':'reconnecting…';
@@ -589,7 +601,7 @@ function initHost(){
   const fmTotal=()=>{ let t=0; G.fm.rows.forEach(r=>r.forEach(c=>{ if(c.rp) t+=(+c.p||0); })); return t; };
   function pub(){
     const q=Q[G.qi]||['',[]];
-    return {title:DATA.title,code:G.code,screen:G.screen,teams:G.teams,control:G.control,showQR:G.showQR,strike:G.strike,
+    return {title:DATA.title,code:G.code,screen:G.screen,introTheme:G.introTheme!==false,teams:G.teams,control:G.control,showQR:G.showQR,strike:G.strike,
       buzz:{open:G.buzz.open,first:G.buzz.first,ts:G.buzz.ts},
       round:{qi:G.qi,total:Q.length,q:q[0],hideQ:G.hideQ,bank:G.bank,mult:G.mult,strikes:G.strikes,slots:q[1].slice(0,8).map((a,i)=>G.revealed[i]?{r:true,a:a[0],p:a[1],u:!!G.unscored[i]}:{r:false})},
       fm:{hideP1:G.fm.hideP1,total:fmTotal(),timer:G.fm.timer,rows:G.fm.rows.map(r=>r.map(c=>({ra:c.ra,rp:c.rp,a:c.ra?c.a:'',p:c.rp?(+c.p||0):''})))}};
@@ -597,9 +609,11 @@ function initHost(){
   const bcLive=('BroadcastChannel' in window)?new BroadcastChannel('ff-live-'+G.code):null; let localTV=0, localCid='', sfxSeq=0;
   if(bcLive) bcLive.onmessage=e=>{ const d=e.data||{}; if(d.t==='hello'&&d.role==='display'){ const was=Date.now()-localTV<9000; localTV=Date.now(); localCid=d.cid||''; try{bcLive.postMessage({t:'state',s:pub()})}catch(x){} if(!was) render(); } };
   const sendAll=m=>{ conns.forEach(c=>{ if(c.conn.open) try{c.conn.send(m)}catch(e){} }); if(bcLive) try{bcLive.postMessage(m)}catch(e){} };
-  function broadcast(){ save(); sendAll({t:'state',s:pub()}); render(); }
-  function broadcastQuiet(){ save(); sendAll({t:'state',s:pub()}); }
-  function sfx(n){ const msg={t:'sfx',n,id:Date.now()+'-'+(++sfxSeq)}; conns.forEach(c=>{ if(c.conn.open&&c.role==='display') try{c.conn.send(msg)}catch(e){} }); if(bcLive) try{bcLive.postMessage(msg)}catch(e){} if(G.hostSound) SFX.play(n); }
+  let lastScr=G.screen;
+  function introCheck(){ if(G.screen===lastScr) return; if(lastScr==='title') sfx('theme',{op:'stop'}); if(G.screen==='title'&&G.introTheme!==false) sfx('theme',{loop:true}); lastScr=G.screen; }
+  function broadcast(){ introCheck(); save(); sendAll({t:'state',s:pub()}); render(); }
+  function broadcastQuiet(){ introCheck(); save(); sendAll({t:'state',s:pub()}); }
+  function sfx(n,extra){ const msg=Object.assign({t:'sfx',n,id:Date.now()+'-'+(++sfxSeq)},extra||{}); conns.forEach(c=>{ if(c.conn.open&&c.role==='display') try{c.conn.send(msg)}catch(e){} }); if(bcLive) try{bcLive.postMessage(msg)}catch(e){} if(G.hostSound) SFX.cmd(msg); }
   function tellPlayer(pid,extra){ const p=G.players[pid]; conns.forEach(c=>{ if(c.pid===pid&&c.conn.open){ c.name=p.name; c.team=p.team; try{c.conn.send(Object.assign({t:'you',name:p.name,team:p.team},extra||{}))}catch(e){} } }); }
 
   function startPeer(){
@@ -726,8 +740,9 @@ function initHost(){
       '<div class="hActions"><a class="hBtn gold" href="'+esc(displayURL)+'" target="_blank" rel="noopener">Open TV display</a><button class="hBtn" data-a="copyjoin">Copy join link</button><button class="hBtn '+(G.hostSound?'on':'')+'" data-a="hostsound">Sound here: '+(G.hostSound?'on':'off')+'</button></div>'+
     '</div>'+
     '<div class="hBar"><span class="lab">TV screen</span>'+['title','board','fm'].map(s=>'<button class="hBtn '+(G.screen===s?'sel':'')+'" data-a="screen" data-v="'+s+'">'+({title:'Title + QR',board:'Main game',fm:'Fast Money'})[s]+'</button>').join('')+
-      '<span style="width:12px"></span><span class="lab">Sound</span><button class="hBtn" data-a="theme">♪ Theme</button><button class="hBtn" data-a="applause">Applause</button><button class="hBtn" data-a="stopsnd">■ Stop</button>'+
+      
       '<span style="width:12px"></span><button class="hBtn '+(G.showQR?'on':'')+'" data-a="qr">Corner QR: '+(G.showQR?'on':'off')+'</button><button class="hBtn" data-a="newgame">New game</button></div>'+
+    '<div class="hBar sndBar"><span class="lab">Sounds</span>'+SOUND_SLOTS.map(([k,l])=>'<span class="sndCtl"><span class="sndName">'+esc(l)+'</span><button class="hBtn sm" data-a="snd" data-op="play" data-v="'+k+'" title="Play or resume">▶</button><button class="hBtn sm" data-a="snd" data-op="pause" data-v="'+k+'" title="Pause">❚❚</button><button class="hBtn sm" data-a="snd" data-op="stop" data-v="'+k+'" title="Stop">■</button></span>').join('')+'<button class="hBtn red" data-a="stopsnd">■ Stop all</button><button class="hBtn '+(G.introTheme!==false?'on':'')+'" data-a="introtheme">Theme on intro: '+(G.introTheme!==false?'on':'off')+'</button></div>'+
     '<div class="hTeams">'+[0,1].map(t=>'<div class="hTeam '+(t?'t2':'')+'"><input data-f="tn'+t+'" data-tn="'+t+'" value="'+esc(G.teams[t].name)+'"><div class="s">'+G.teams[t].score+'</div>'+
       '<div class="row"><button class="hBtn green" data-a="award" data-v="'+t+'">Award bank</button><button class="hBtn" data-a="score" data-v="'+t+'" data-d="-5">−5</button><button class="hBtn" data-a="score" data-v="'+t+'" data-d="5">+5</button><button class="hBtn '+(G.control===t?'sel':'')+'" data-a="control" data-v="'+t+'">In control</button></div></div>').join('')+'</div>'+
     (G.screen==='fm'?fmPanel():mainPanels(q))+
@@ -796,7 +811,7 @@ function initHost(){
       case 'mult': A.mult(+v); break; case 'hideq': G.hideQ=!G.hideQ; broadcast(); break;
       case 'openbuzz': A.openBuzz(); break; case 'lockbuzz': A.lockBuzz(); break; case 'resetbuzz': A.resetBuzz(); break;
       case 'screen': G.screen=v; broadcast(); break;
-      case 'theme': sfx('theme'); break; case 'applause': sfx('applause'); break; case 'stopsnd': sfx('stop'); break;
+      case 'theme': sfx('theme'); break; case 'snd': sfx(v,{op:b.dataset.op}); break; case 'introtheme': G.introTheme=(G.introTheme===false); save(); if(G.screen==='title') sfx('theme',G.introTheme?{loop:true}:{op:'stop'}); render(); break; case 'applause': sfx('applause'); break; case 'stopsnd': sfx('stop'); break;
       case 'qr': G.showQR=!G.showQR; broadcast(); break;
       case 'hostsound': G.hostSound=!G.hostSound; save(); render(); break;
       case 'newgame': A.newGame(); break;
