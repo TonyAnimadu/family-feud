@@ -1,6 +1,7 @@
 // Edit your questions here, then commit. Format: ["Question", [["Answer", points], ...]]  (up to 8 answers, highest points first)
 window.FEUD_DATA = {
- title: "Adult Family Feud",
+ title: "Family Feud",
+ code: "AAHJT",
  questions: [
   ["Name something that would make you think your friend is entertaining someone they shouldn't be", [["Secretive with their phone", 34], ["Vague about where they've been", 22], ["Smiling at texts", 16], ["Suddenly always busy", 12], ["Gets defensive", 9], ["Same name keeps coming up", 7]]],
   ["Name a situation where someone would suddenly start acting brand new", [["New relationship", 30], ["New Money/New Job", 26], ["Around new friend group", 16], ["Got famous on social media", 12], ["Moved to a new city", 9], ["Had a glow up", 7]]],

@@ -1,4 +1,4 @@
-# Adult Family Feud
+# Family Feud
 
 A party Family Feud game with a host controller, a TV display, and phone buzzers. Players join by scanning a QR code. No accounts or apps are needed.
 
