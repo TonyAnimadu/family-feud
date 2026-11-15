@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:ital,wght@0,500;0,600;0,700;0,800;0,900;1,900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script src="questions.js"></script>
+<script src="questions.js?v=5"></script>
 <style>
 /* ---------- palette: navy base, royal blue tiles, warm gold accent (complement), team blue vs coral ---------- */
 :root{
@@ -58,15 +58,20 @@ button{cursor:pointer}
 
 /* ---------- TV display ---------- */
 #display{position:fixed;inset:0;z-index:2;display:flex;align-items:center;justify-content:center}
-.titleScreen{display:flex;flex-direction:column;align-items:center;gap:5vh}
+.titleScreen{display:flex;align-items:center;justify-content:center;width:100%;height:100vh}
+.titleJoin{position:fixed;right:3vmin;bottom:3vmin;z-index:5;display:flex;align-items:center;gap:2vmin;background:rgba(8,20,50,.88);border:.25vmin solid rgba(242,181,68,.7);border-radius:2vmin;padding:1.6vmin 2.2vmin;box-shadow:0 1.5vmin 4vmin rgba(0,0,0,.4)}
+.titleJoin .qr{background:#fff;padding:.8vmin;border-radius:1vmin;width:12.5vmin;height:12.5vmin}
+.titleJoin .qr svg{width:100%;height:100%;display:block}
+.titleJoin .lbl{font-size:1.7vmin;color:#cdd9f7;text-transform:uppercase;letter-spacing:.3vmin;font-weight:600}
+.titleJoin .code{font-family:var(--ffh);font-weight:800;font-size:5.5vmin;letter-spacing:.8vmin;color:var(--gold-hi);line-height:1.05;margin-top:.6vmin}
 .joinBox{display:flex;align-items:center;gap:4vmin;background:rgba(8,20,50,.88);border:.35vmin solid rgba(242,181,68,.7);border-radius:3vmin;padding:3vmin 4.5vmin;box-shadow:0 2vmin 6vmin rgba(0,0,0,.4)}
 .joinBox .qr{background:#fff;padding:1.4vmin;border-radius:1.6vmin;width:25vmin;height:25vmin}
 .joinBox .qr svg,.cornerQR .qr svg{width:100%;height:100%;display:block}
 .joinBox .lbl{font-size:3.2vmin;color:#cdd9f7;text-transform:uppercase;letter-spacing:.35vmin;font-weight:600}
 .joinBox .code{font-family:var(--ffh);font-weight:800;font-size:11vmin;letter-spacing:1.6vmin;color:var(--gold-hi);line-height:1.05;margin-top:1vmin}
 
-.boardWrap{width:min(94vw,168vh);display:flex;flex-direction:column;align-items:center;gap:2.2vh}
-.question{font-weight:700;font-size:min(3.6vw,4.8vh);text-align:center;text-transform:uppercase;line-height:1.18;letter-spacing:.02em;padding:0 4vw;max-width:92vw;text-shadow:0 .3vh .8vh rgba(0,0,0,.6)}
+.boardWrap{width:min(94vw,168vh);display:flex;flex-direction:column;align-items:center;gap:2vh;padding-top:11vh}
+.question{font-weight:700;font-size:min(3.3vw,4.4vh);text-align:center;text-transform:uppercase;line-height:1.18;letter-spacing:.02em;padding:0 4vw;max-width:92vw;text-shadow:0 .3vh .8vh rgba(0,0,0,.6)}
 .boardRow{display:grid;grid-template-columns:1fr minmax(0,62vw) 1fr;align-items:center;gap:2vw;width:100%}
 .teamBox{display:flex;flex-direction:column;align-items:center;gap:1vh}
 .teamName{font-family:var(--ffh);font-weight:800;font-size:min(2.1vw,3vh);text-transform:uppercase;letter-spacing:.12em;padding:.8vh 1.6vw;border-radius:1vh;background:var(--t1);color:#fff;max-width:15vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 .5vh 1.5vh rgba(0,0,0,.35)}
@@ -81,8 +86,8 @@ button{cursor:pointer}
 .boardStage{position:relative;width:100%}
 .board{width:100%;padding:3vh 2.2vw;border-radius:2.6vh;background:linear-gradient(#0b1f4f,#071434);
   border:.7vh solid var(--gold);box-shadow:0 0 0 .45vh var(--gold-lo),0 0 0 .9vh rgba(255,216,137,.35),0 2vh 6vh rgba(0,0,0,.6),inset 0 0 3vh rgba(0,0,0,.7);
-  display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(4,auto);grid-auto-flow:column;gap:2.2vh 1.8vw}
-.slot{height:min(10.4vh,7vw);perspective:120vh}
+  display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(4,auto);grid-auto-flow:column;gap:1.9vh 1.8vw}
+.slot{height:min(9.4vh,6.6vw);perspective:120vh}
 .slot .inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.34,1.4,.5,1)}
 .slot.flip .inner{transform:rotateX(-180deg)}
 .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:1.2vh;display:flex;align-items:center;justify-content:center;overflow:hidden;
@@ -99,11 +104,11 @@ button{cursor:pointer}
 .slot.unscored .back{filter:saturate(.45) brightness(.8)}
 
 .strikes{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:2.4vw;z-index:20;pointer-events:none}
-.xmark{width:min(22vh,15vw);height:min(22vh,15vw);animation:xin .28s cubic-bezier(.2,1.6,.4,1)}
-.xmark svg{width:100%;height:100%;display:block;filter:drop-shadow(0 0 2.5vh rgba(229,72,77,.65)) drop-shadow(0 1vh 2vh rgba(0,0,0,.5))}
+.xmark{width:min(33vh,22.5vw);height:min(33vh,22.5vw);animation:xin .28s cubic-bezier(.2,1.6,.4,1)}
+.xmark svg{width:100%;height:100%;display:block;filter:drop-shadow(0 0 3vh rgba(229,72,77,.55)) drop-shadow(0 1.2vh 2.4vh rgba(0,0,0,.45))}
 @keyframes xin{from{transform:scale(1.8);opacity:0}to{transform:scale(1);opacity:1}}
 
-.buzzBanner{position:fixed;left:50%;top:5vh;transform:translateX(-50%);z-index:15;font-family:var(--ffh);font-weight:800;font-size:min(3.6vw,5.4vh);text-transform:uppercase;letter-spacing:.1em;padding:1.6vh 3.6vw;border-radius:2vh;color:#fff;
+.buzzBanner{position:fixed;left:50%;top:2.6vh;transform:translateX(-50%);z-index:15;font-family:var(--ffh);font-weight:800;font-size:min(2.8vw,4.2vh);text-transform:uppercase;letter-spacing:.1em;padding:1.3vh 3vw;border-radius:2vh;color:#fff;
   background:var(--t1);border:.35vh solid rgba(255,255,255,.85);box-shadow:0 1.5vh 5vh rgba(0,0,0,.5),0 0 4vh rgba(59,130,246,.6);animation:bin .3s cubic-bezier(.2,1.5,.4,1);white-space:nowrap}
 .buzzBanner.t2{background:var(--t2);box-shadow:0 1.5vh 5vh rgba(0,0,0,.5),0 0 4vh rgba(240,100,79,.6)}
 @keyframes bin{from{transform:translate(-50%,-30%) scale(.8);opacity:0}to{transform:translate(-50%,0) scale(1);opacity:1}}
@@ -202,7 +207,8 @@ body.phone .stage{--rayY:58%}
 .qSel{flex:1;min-width:0;background:#0a1a44;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:9px;font-size:14px}
 .bankLine{font-family:var(--ffh);font-weight:800;font-size:24px;letter-spacing:.06em}
 .bankLine span{color:var(--gold-hi)}
-.strikeDots{display:flex;gap:6px}
+.strikeDots{display:flex;gap:6px;margin-right:6px}
+.strikeTeam{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .strikeDots i{width:30px;height:30px;border-radius:8px;background:#1b2a52;display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:800;font-size:16px;color:#4a5a85}
 .strikeDots i.on{background:var(--bad);color:#fff}
 .buzzInfo{font-family:var(--ffh);font-weight:800;font-size:19px;padding:12px;border-radius:12px;background:#0a1a44;border:1.5px dashed var(--line);text-align:center;letter-spacing:.04em}
@@ -363,7 +369,8 @@ function soundPanelHTML(){
     '<button class="hBtn" data-sndtest="'+k+'">▶ Test</button>'+(nm[k]?'<button class="hBtn" data-sndreset="'+k+'">Reset</button>':'')+'</div>').join('')+'</div>'+
     '<div class="small" style="margin-top:10px">Files stay in this browser only and are never uploaded. A TV window open in this same browser uses them too. A TV on a different device needs its own files, loaded from the TV\'s start screen.</div>';
 }
-function xSVG(){ return '<svg viewBox="0 0 100 100"><g transform="rotate(45 50 50)"><rect x="40" y="6" width="20" height="88" rx="7" fill="#e5484d" stroke="#fff" stroke-width="4"/><rect x="6" y="40" width="88" height="20" rx="7" fill="#e5484d" stroke="#fff" stroke-width="4"/><rect x="42" y="42" width="16" height="16" fill="#e5484d"/></g></svg>'; }
+function xSVG(){ return '<svg viewBox="0 0 100 100"><defs><linearGradient id="xg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6f6a"/><stop offset="1" stop-color="#d23a3f"/></linearGradient></defs>'+
+  '<path d="M17 8 L50 41 L83 8 L92 17 L59 50 L92 83 L83 92 L50 59 L17 92 L8 83 L41 50 L8 17 Z" fill="url(#xg)" stroke="url(#xg)" stroke-width="7" stroke-linejoin="round"/></svg>'; }
 
 /* ================= ROUTER ================= */
 const role = params.has('host')?'host': params.get('display')?'display': params.has('join')?'player':'landing';
@@ -413,8 +420,8 @@ function initDisplay(code){
   }
   function renderTitle(main){
     if(main.dataset.k===code) return; main.dataset.k=code;
-    main.innerHTML='<div class="titleScreen">'+logoHTML('min(52vmin,70vw)')+
-      '<div class="joinBox"><div class="qr">'+qrSVG(joinURL)+'</div><div><div class="lbl">Scan to join</div><div class="lbl" style="margin-top:2.4vmin;font-size:2.4vmin;color:#a9b7da">Game code</div><div class="code">'+esc(code)+'</div></div></div></div>';
+    main.innerHTML='<div class="titleScreen">'+logoHTML('min(62vmin,80vw)')+'</div>'+
+      '<div class="titleJoin"><div class="qr">'+qrSVG(joinURL)+'</div><div><div class="lbl">Scan to join</div><div class="code">'+esc(code)+'</div></div></div>';
   }
   function renderBoard(main){
     const R=S.round; if(!R) return;
@@ -521,7 +528,7 @@ function initHost(){
   let G=LS.get('ff-host',null);
   if(!G){ G={teams:[{name:'Team 1',score:0},{name:'Team 2',score:0}],screen:'title',qi:0,revealed:[],unscored:[],bank:0,mult:1,strikes:0,strike:null,awarded:false,control:null,hideQ:false,showQR:true,
     buzz:{open:false,first:null,ts:0},fm:{rows:blankFM(),hideP1:false,timer:{running:false,left:0}},hostSound:false,players:{}}; }
-  G.code=FIXED_CODE; G.players=G.players||{}; G.buzz=G.buzz||{open:false,first:null,ts:0};
+  G.code=FIXED_CODE; G.players=G.players||{}; G.strikesT=G.strikesT||[0,0]; G.buzz=G.buzz||{open:false,first:null,ts:0};
   if(G.fm&&G.fm.timer) G.fm.timer.running=false;
   const conns=new Map();
   let peer=null, idTries=0;
@@ -575,13 +582,13 @@ function initHost(){
   function doBuzz(b){ if(!G.buzz.open||G.buzz.first||b.team==null) return; G.buzz.first=b; G.buzz.ts=Date.now(); G.buzz.open=false; G.control=b.team; sfx('buzz'); broadcast(); }
 
   const A={
-    gotoQ(i){ G.qi=Math.max(0,Math.min(Q.length-1,i)); G.revealed=[]; G.unscored=[]; G.bank=0; G.strikes=0; G.awarded=false; G.control=null; G.buzz={open:false,first:null,ts:0}; G.screen='board'; broadcast(); },
+    gotoQ(i){ G.qi=Math.max(0,Math.min(Q.length-1,i)); G.revealed=[]; G.unscored=[]; G.bank=0; G.strikes=0; G.strikesT=[0,0]; G.awarded=false; G.control=null; G.buzz={open:false,first:null,ts:0}; G.screen='board'; broadcast(); },
     reveal(i){ const a=Q[G.qi][1][i]; if(!a||G.revealed[i]) return; G.revealed[i]=true; if(!G.awarded) G.bank+=a[1]*G.mult; else G.unscored[i]=true; sfx('ding'); broadcast(); },
     hide(i){ const a=Q[G.qi][1][i]; if(!G.revealed[i]) return; G.revealed[i]=false; if(!G.unscored[i]) G.bank=Math.max(0,G.bank-a[1]*G.mult); G.unscored[i]=false; broadcast(); },
     revealRest(){ Q[G.qi][1].forEach((a,i)=>{ if(!G.revealed[i]){ G.revealed[i]=true; G.unscored[i]=true; } }); sfx('reveal'); broadcast(); },
-    strike(){ G.strikes=Math.min(3,G.strikes+1); G.strike={n:G.strikes,ts:Date.now()}; sfx('strike'); broadcast(); },
+    strike(t){ if(t==null){ flash('Set which team is in control first'); return; } G.strikesT[t]=Math.min(3,G.strikesT[t]+1); G.strike={n:G.strikesT[t],team:t,ts:Date.now()}; sfx('strike'); broadcast(); },
     oneX(){ G.strike={n:1,ts:Date.now()}; sfx('strike'); broadcast(); },
-    clearStrikes(){ G.strikes=0; broadcast(); },
+    clearStrikes(){ G.strikes=0; G.strikesT=[0,0]; broadcast(); },
     award(t){ if(G.bank<=0) return; G.teams[t].score+=G.bank; G.bank=0; G.awarded=true; G.control=t; sfx('win'); broadcast(); },
     mult(m){ let bank=0; G.mult=m; Q[G.qi][1].forEach((a,i)=>{ if(G.revealed[i]&&!G.unscored[i]) bank+=a[1]*m; }); if(!G.awarded) G.bank=bank; broadcast(); },
     openBuzz(){ G.buzz={open:true,first:null,ts:0}; sendAll({t:'sfx',n:'buzzopen'}); broadcast(); },
@@ -604,7 +611,7 @@ function initHost(){
     const k=e.key.toLowerCase();
     if(k==='a') doBuzz({pid:'kbd-a',name:'',team:0});
     if(k==='l') doBuzz({pid:'kbd-l',name:'',team:1});
-    if(k==='x') A.strike();
+    if(k==='x') A.strike(G.control);
     if(k>='1'&&k<='8') A.reveal(+k-1);
   });
 
@@ -631,7 +638,7 @@ function initHost(){
         : '<div class="small">Nobody yet. Put the Title screen on the TV so people can scan the QR code.</div>')+
       '<div class="small" style="margin-top:10px">Tap a team button to move a player. ✕ removes them and sends them back to the join screen.</div></div>'+
       '<div class="panel"><h3>Links and shortcuts</h3><div class="small">Site: <a href="'+esc(baseURL)+'" target="_blank" rel="noopener">'+esc(baseURL)+'</a></div><div class="small">Join link: '+esc(joinURL)+'</div><div class="small">TV link: '+esc(displayURL)+'</div>'+
-      '<div class="small" style="margin-top:8px">Keyboard: <kbd>A</kbd> Team 1 buzz · <kbd>L</kbd> Team 2 buzz · <kbd>1</kbd>–<kbd>8</kbd> flip · <kbd>X</kbd> strike</div></div></div>'+
+      '<div class="small" style="margin-top:8px">Keyboard: <kbd>A</kbd> Team 1 buzz · <kbd>L</kbd> Team 2 buzz · <kbd>1</kbd>–<kbd>8</kbd> flip · <kbd>X</kbd> strike for the team in control</div></div></div>'+
     '<div class="panel" style="margin-top:14px"><h3>Custom sounds</h3>'+soundPanelHTML()+'</div>';
     if(focus){ const el=root.querySelector('[data-f="'+focus+'"]'); if(el){ el.focus(); try{ const v=el.value; el.setSelectionRange(v.length,v.length);}catch(e){} } }
   }
@@ -641,7 +648,8 @@ function initHost(){
       '<div class="row"><button class="hBtn" data-a="prev">◀ Prev</button><select class="qSel" data-a2="jump">'+Q.map((x,i)=>'<option value="'+i+'" '+(i===G.qi?'selected':'')+'>'+(i+1)+'. '+esc(x[0].replace(/^Name /,'').slice(0,60))+'</option>').join('')+'</select><button class="hBtn gold" data-a="next">Next ▶</button></div>'+
       '<div class="qText">'+esc(q[0])+'</div>'+
       '<div class="row"><span class="bankLine">BANK <span>'+G.bank+'</span></span><span style="flex:1"></span>'+[1,2,3].map(m=>'<button class="hBtn '+(G.mult===m?'sel':'')+'" data-a="mult" data-v="'+m+'">x'+m+'</button>').join('')+'</div>'+
-      '<div class="row"><button class="hBtn red" data-a="strike">✕ Strike</button><div class="strikeDots">'+[1,2,3].map(i=>'<i class="'+(G.strikes>=i?'on':'')+'">X</i>').join('')+'</div><button class="hBtn" data-a="onex">Single X</button><button class="hBtn" data-a="clearx">Clear</button></div>'+
+      [0,1].map(t=>'<div class="row strikeTeam"><button class="hBtn red" data-a="strike" data-v="'+t+'">✕ Wrong: '+esc(G.teams[t].name)+'</button><div class="strikeDots">'+[1,2,3].map(i=>'<i class="'+(G.strikesT[t]>=i?'on':'')+'">X</i>').join('')+'</div></div>').join('')+
+      '<div class="row"><button class="hBtn" data-a="onex">Single X (face-off)</button><button class="hBtn" data-a="clearx">Clear strikes</button></div>'+
       '<div class="row"><button class="hBtn '+(G.hideQ?'on':'')+'" data-a="hideq">Question on TV: '+(G.hideQ?'hidden':'shown')+'</button><button class="hBtn" data-a="revealrest">Reveal rest (no points)</button></div>'+
       '<h3 style="margin-top:16px">Buzzers</h3>'+
       '<div class="buzzInfo '+(B.first?'hit':B.open?'open':'')+'">'+(B.first?esc((B.first.name?B.first.name+' · ':'')+G.teams[B.first.team].name)+' buzzed first':B.open?'Buzzers open, waiting…':'Buzzers locked')+'</div>'+
@@ -670,7 +678,7 @@ function initHost(){
     switch(a){
       case 'prev': A.gotoQ(G.qi-1); break; case 'next': A.gotoQ(G.qi+1); break;
       case 'reveal': A.reveal(+v); break; case 'hide': A.hide(+v); break; case 'revealrest': A.revealRest(); break;
-      case 'strike': A.strike(); break; case 'onex': A.oneX(); break; case 'clearx': A.clearStrikes(); break;
+      case 'strike': A.strike(+v); break; case 'onex': A.oneX(); break; case 'clearx': A.clearStrikes(); break;
       case 'award': A.award(+v); break; case 'score': A.score(+v,+b.dataset.d); break; case 'control': G.control=G.control===+v?null:+v; broadcast(); break;
       case 'mult': A.mult(+v); break; case 'hideq': G.hideQ=!G.hideQ; broadcast(); break;
       case 'openbuzz': A.openBuzz(); break; case 'lockbuzz': A.lockBuzz(); break; case 'resetbuzz': A.resetBuzz(); break;
