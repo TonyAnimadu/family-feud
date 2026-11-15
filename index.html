@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:ital,wght@0,500;0,600;0,700;0,800;0,900;1,900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script src="questions.js?v=11"></script>
+<script src="questions.js?v=12"></script>
 <style>
 /* ---------- palette: navy base, royal blue tiles, warm gold accent (complement), team blue vs coral ---------- */
 :root{
@@ -353,29 +353,55 @@ function qrSVG(text){ try{ const q=qrcode(0,'M'); q.addData(text); q.make(); ret
 function makeCode(){ const L='ABCDEFGHJKMNPQRSTUVWXYZ'; let s=''; for(let i=0;i<4;i++) s+=L[Math.floor(Math.random()*L.length)]; return s; }
 function peerOpts(){ return {debug:0, config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'}]}}; }
 
-/* client connection with auto-reconnect */
+/* backup route: Trystero over Nostr relays (only used to find each other; game data goes direct, encrypted) */
+let _trysP=null;
+function loadTrystero(){
+  if(!_trysP) _trysP=import('https://esm.sh/trystero@0.21.8').catch(()=>import('https://cdn.jsdelivr.net/npm/trystero@0.21.8/+esm')).catch(e=>{ _trysP=null; throw e; });
+  return _trysP;
+}
+function backupRoom(T,code){ return T.joinRoom({appId:'adultfeud-ta-v1',password:'ff-'+code+'-ta',relayRedundancy:6,rtcConfig:peerOpts().config},'room-'+code); }
+
+/* client connection with auto-reconnect (PeerJS + backup route in parallel) */
 function connectClient(code, hello, onMsg, onStatus){
-  let peer=null, conn=null, dead=false, timer=null, watch=null;
+  let peer=null, conn=null, dead=false, timer=null, watch=null, last='connecting';
+  let tsend=null, tHost=null, tOk=false;
+  const pOpen=()=>!!(conn&&conn.open);
+  function report(st){ if(st) last=st; onStatus((tOk||pOpen())?'connected':last); }
   function start(){
-    onStatus('connecting');
+    report('connecting');
     if(peer){ try{peer.destroy()}catch(e){} }
-    clearTimeout(watch); watch=setTimeout(()=>{ if(!conn||!conn.open) start(); },12000);
-    peer=new Peer(undefined, peerOpts());
+    clearTimeout(watch); watch=setTimeout(()=>{ if(!pOpen()) start(); },12000);
+    try{ peer=new Peer(undefined, peerOpts()); }catch(e){ retry(); return; }
     peer.on('open',()=>{
       conn=peer.connect(PREFIX+code,{reliable:true});
-      conn.on('open',()=>{ onStatus('connected'); conn.send(hello()); });
+      conn.on('open',()=>{ report('connected'); conn.send(hello()); });
       conn.on('data',onMsg);
-      conn.on('close',()=>{ onStatus('lost'); retry(); });
-      conn.on('error',()=>{ onStatus('lost'); retry(); });
+      conn.on('close',()=>{ report('lost'); retry(); });
+      conn.on('error',()=>{ report('lost'); retry(); });
     });
-    peer.on('error',e=>{ onStatus(e&&e.type==='peer-unavailable'?'nohost':'lost'); retry(); });
+    peer.on('error',e=>{ report(e&&e.type==='peer-unavailable'?'nohost':'lost'); retry(); });
     peer.on('disconnected',()=>{ try{peer.reconnect()}catch(e){} });
   }
   function retry(){ if(dead||timer) return; timer=setTimeout(()=>{timer=null; start();},2500); }
-  start();
-  return { send:m=>{ if(conn&&conn.open) conn.send(m); }, reconnect:()=>{ if(!conn||!conn.open) start(); } };
+  function startBackup(){
+    loadTrystero().then(T=>{
+      const room=backupRoom(T,code);
+      const [s,g]=room.makeAction('m'); tsend=s;
+      room.onPeerJoin(id=>{ try{ s(hello(),id); }catch(e){} });
+      room.onPeerLeave(id=>{ if(id===tHost){ tHost=null; tOk=false; report(); } });
+      g((m,id)=>{
+        if(!m) return;
+        if(m.t==='state'){ if(tHost!==id){ tHost=id; if(!tOk){ tOk=true; report(); try{ s(hello(),id); }catch(e){} } } }
+        if(id===tHost) onMsg(m);
+      });
+    }).catch(()=>{ setTimeout(startBackup,8000); });
+  }
+  start(); startBackup();
+  return {
+    send:m=>{ if(pOpen()) conn.send(m); else if(tOk&&tsend&&tHost) try{ tsend(m,tHost); }catch(e){} },
+    reconnect:()=>{ if(!pOpen()) start(); }
+  };
 }
-
 function soundPanelHTML(){
   const nm=SoundStore.names();
   return '<div class="sndList">'+SOUND_SLOTS.map(([k,l])=>'<div class="sndRow"><div class="sl">'+esc(l)+'<div class="sf">'+(nm[k]?'♪ '+esc(nm[k]):'Built-in sound')+'</div></div>'+
@@ -415,7 +441,7 @@ function initDisplay(code){
     const draw=()=>{ m.innerHTML='<div class="panel"><h3>Custom sounds <button class="hBtn" data-close="1">Close</button></h3>'+soundPanelHTML()+'</div>'; };
     draw(); wireSoundPanel(m,draw); m.addEventListener('click',ev=>{ ev.stopPropagation(); if(ev.target.dataset.close) m.remove(); }); document.body.appendChild(m); };
   $('#dStart').onclick=()=>{ SFX.unlock(); audioOn=true; $('#dStart').remove(); try{ const p=document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen(); if(p&&p.catch) p.catch(()=>{}); }catch(e){} };
-  const seenSfx=[]; let netSt='connecting', lastLocal=0;
+  const seenSfx=[]; let netSt='connecting', lastLocal=0; const cid=Math.random().toString(36).slice(2,10);
   const onMsg=msg=>{
     if(msg.t==='state'){ S=msg.s; if(!primed){ primed=true; prevStrikeTs=S.strike?S.strike.ts:0; prevBuzzTs=S.buzz&&S.buzz.first?S.buzz.ts:0; } render(); }
     if(msg.t==='sfx'){ if(msg.id){ if(seenSfx.includes(msg.id)) return; seenSfx.push(msg.id); if(seenSfx.length>60) seenSfx.shift(); } if(audioOn) SFX.play(msg.n); }
@@ -424,8 +450,8 @@ function initDisplay(code){
     d.textContent= netSt==='connected'?'● live':local?'● live (this laptop)':netSt==='nohost'?'waiting for host…':'reconnecting…';
     d.style.color=(netSt==='connected'||local)?'#5fe39b':'#ffb3b3'; };
   const bcLive=('BroadcastChannel' in window)?new BroadcastChannel('ff-live-'+code):null;
-  if(bcLive){ bcLive.onmessage=e=>{ lastLocal=Date.now(); onMsg(e.data||{}); showConn(); }; const hi=()=>{ try{bcLive.postMessage({t:'hello',role:'display'})}catch(x){} }; hi(); setInterval(()=>{ hi(); showConn(); },3000); }
-  connectClient(code,()=>({t:'hello',role:'display'}),onMsg,st=>{ netSt=st; showConn(); });
+  if(bcLive){ bcLive.onmessage=e=>{ lastLocal=Date.now(); onMsg(e.data||{}); showConn(); }; const hi=()=>{ try{bcLive.postMessage({t:'hello',role:'display',cid})}catch(x){} }; hi(); setInterval(()=>{ hi(); showConn(); },3000); }
+  connectClient(code,()=>({t:'hello',role:'display',cid}),onMsg,st=>{ netSt=st; showConn(); });
 
   function render(){
     if(!S) return;
@@ -568,8 +594,8 @@ function initHost(){
       round:{qi:G.qi,total:Q.length,q:q[0],hideQ:G.hideQ,bank:G.bank,mult:G.mult,strikes:G.strikes,slots:q[1].slice(0,8).map((a,i)=>G.revealed[i]?{r:true,a:a[0],p:a[1],u:!!G.unscored[i]}:{r:false})},
       fm:{hideP1:G.fm.hideP1,total:fmTotal(),timer:G.fm.timer,rows:G.fm.rows.map(r=>r.map(c=>({ra:c.ra,rp:c.rp,a:c.ra?c.a:'',p:c.rp?(+c.p||0):''})))}};
   }
-  const bcLive=('BroadcastChannel' in window)?new BroadcastChannel('ff-live-'+G.code):null; let localTV=0, sfxSeq=0;
-  if(bcLive) bcLive.onmessage=e=>{ const d=e.data||{}; if(d.t==='hello'&&d.role==='display'){ const was=Date.now()-localTV<9000; localTV=Date.now(); try{bcLive.postMessage({t:'state',s:pub()})}catch(x){} if(!was) render(); } };
+  const bcLive=('BroadcastChannel' in window)?new BroadcastChannel('ff-live-'+G.code):null; let localTV=0, localCid='', sfxSeq=0;
+  if(bcLive) bcLive.onmessage=e=>{ const d=e.data||{}; if(d.t==='hello'&&d.role==='display'){ const was=Date.now()-localTV<9000; localTV=Date.now(); localCid=d.cid||''; try{bcLive.postMessage({t:'state',s:pub()})}catch(x){} if(!was) render(); } };
   const sendAll=m=>{ conns.forEach(c=>{ if(c.conn.open) try{c.conn.send(m)}catch(e){} }); if(bcLive) try{bcLive.postMessage(m)}catch(e){} };
   function broadcast(){ save(); sendAll({t:'state',s:pub()}); render(); }
   function broadcastQuiet(){ save(); sendAll({t:'state',s:pub()}); }
@@ -593,11 +619,24 @@ function initHost(){
       else { setNet('Connection issue, retrying…'); setTimeout(()=>{ if(peer.destroyed||peer.disconnected) startPeer(); },3000); }
     });
   }
+  let bkNet='Backup route: starting…', bkRoom=null;
+  function setBk(t){ bkNet=t; const el=$('#hBk'); if(el) el.textContent=t; }
+  function startBackup(){
+    loadTrystero().then(T=>{
+      bkRoom=backupRoom(T,G.code);
+      const [s,g]=bkRoom.makeAction('m');
+      const mk=id=>{ const conn={open:true,peer:'t:'+id,send:m=>s(m,id)}; const c={conn,role:'?'}; conns.set(conn.peer,c); return c; };
+      bkRoom.onPeerJoin(id=>{ const c=conns.get('t:'+id)||mk(id); try{ c.conn.send({t:'state',s:pub()}); }catch(e){} render(); });
+      bkRoom.onPeerLeave(id=>{ const c=conns.get('t:'+id); if(c) c.conn.open=false; conns.delete('t:'+id); render(); });
+      g((m,id)=>{ if(!m) return; const c=conns.get('t:'+id)||mk(id); onMsg(c.conn,m); });
+      setBk('● Backup route on');
+    }).catch(()=>{ setBk('Backup route: retrying…'); setTimeout(startBackup,8000); });
+  }
   function setNet(t){ G._net=t; const el=$('#hNet'); if(el) el.textContent=t; }
   function onMsg(conn,m){
     const c=conns.get(conn.peer)||{conn};
     if(m.t==='hello'){
-      c.role=m.role; c.pid=m.pid;
+      c.role=m.role; c.pid=m.pid; c.cid=m.cid;
       if(m.role==='player'){
         const known=G.players[m.pid];
         if(known){ c.name=known.name; c.team=known.team; conns.set(conn.peer,c); tellPlayer(m.pid); }
@@ -677,13 +716,13 @@ function initHost(){
   function render(){
     const q=Q[G.qi]||['',[]];
     const displayURL=baseURL+'?display='+G.code, joinURL=baseURL+'?join='+G.code;
-    const live=[...conns.values()], displays=live.filter(c=>c.role==='display').concat(Date.now()-localTV<9000?[{local:true}]:[]), onlinePids=new Set(live.filter(c=>c.role==='player').map(c=>c.pid));
+    const live=[...conns.values()], displays=[...new Set(live.filter(c=>c.role==='display').map(c=>c.cid||Math.random()).concat(Date.now()-localTV<9000?[localCid||'local']:[]))], onlinePids=new Set(live.filter(c=>c.role==='player').map(c=>c.pid));
     const focus=document.activeElement&&document.activeElement.dataset?document.activeElement.dataset.f:null;
     const pids=Object.keys(G.players);
     root.innerHTML=
     '<div class="hHead">'+logoHTML('120px')+
       '<div class="hCode"><div class="small">Game code</div><div class="code">'+esc(G.code)+'</div></div>'+
-      '<div class="hInfo"><div class="small" id="hNet">'+esc(G._net||'Starting…')+'</div><div class="small">'+displays.length+' TV · '+onlinePids.size+' of '+pids.length+' players online</div><div class="small" id="hFlash" style="color:var(--gold-hi);transition:opacity .4s;opacity:0">.</div></div>'+
+      '<div class="hInfo"><div class="small" id="hNet">'+esc(G._net||'Starting…')+'</div><div class="small" id="hBk">'+esc(bkNet)+'</div><div class="small">'+displays.length+' TV · '+onlinePids.size+' of '+pids.length+' players online</div><div class="small" id="hFlash" style="color:var(--gold-hi);transition:opacity .4s;opacity:0">.</div></div>'+
       '<div class="hActions"><a class="hBtn gold" href="'+esc(displayURL)+'" target="_blank" rel="noopener">Open TV display</a><button class="hBtn" data-a="copyjoin">Copy join link</button><button class="hBtn '+(G.hostSound?'on':'')+'" data-a="hostsound">Sound here: '+(G.hostSound?'on':'off')+'</button></div>'+
     '</div>'+
     '<div class="hBar"><span class="lab">TV screen</span>'+['title','board','fm'].map(s=>'<button class="hBtn '+(G.screen===s?'sel':'')+'" data-a="screen" data-v="'+s+'">'+({title:'Title + QR',board:'Main game',fm:'Fast Money'})[s]+'</button>').join('')+
@@ -797,7 +836,7 @@ function initHost(){
   setInterval(()=>{ if(peer&&(peer.destroyed||(peer.disconnected&&!peer.open))) startPeer(); },15000);
   setInterval(()=>{ if(localTV&&Date.now()-localTV>9000){ localTV=0; render(); } },5000);
   wireSoundPanel(root,()=>render()); SoundStore.onchange=()=>render();
-  render(); startPeer();
+  render(); startPeer(); startBackup();
 }
 })();
 </script>
