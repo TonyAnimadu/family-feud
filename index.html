@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:ital,wght@0,500;0,600;0,700;0,800;0,900;1,900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script src="questions.js?v=8"></script>
+<script src="questions.js?v=9"></script>
 <style>
 /* ---------- palette: navy base, royal blue tiles, warm gold accent (complement), team blue vs coral ---------- */
 :root{
@@ -235,6 +235,14 @@ body.phone .stage{--rayY:58%}
 .fmCell .pp{width:64px}
 .fmCell .row{margin:0}
 kbd{background:#1b2a52;border-radius:5px;padding:1px 6px;font-family:inherit;font-size:12px}
+.edQ{width:100%;background:#06102a;border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:10px;font-size:16px;font-family:inherit;resize:vertical;outline:none}
+.edQ:focus{border-color:var(--gold)}
+.edRow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.edRow .n{font-family:var(--ffh);font-weight:800;color:var(--gold-hi);width:20px}
+.edRow input{background:#06102a;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px;font-size:15px;outline:none}
+.edRow input:focus{border-color:var(--gold)}
+.edRow input:not([type=number]){flex:1;min-width:0}
+.edRow input[type=number]{width:70px}
 .sndList{display:flex;flex-direction:column;gap:8px}
 .sndRow{display:flex;align-items:center;gap:8px;background:#0a1a44;border:1px solid var(--line);border-radius:12px;padding:9px 12px;text-align:left}
 .sndRow .sl{flex:1;font-size:15px}.sndRow .sf{font-size:12px;color:var(--muted);word-break:break-all;margin-top:2px}
@@ -530,12 +538,16 @@ function initPlayer(code){
 function initHost(){
   const root=$('#host'); root.classList.remove('hidden');
   document.querySelector('.stage').style.display='none';
-  const Q=DATA.questions, FMQ=(DATA.fastMoney||[]).slice(0,5); while(FMQ.length<5) FMQ.push('Fast Money question '+(FMQ.length+1));
+  const QKEY='ff-q-override', clone=x=>JSON.parse(JSON.stringify(x));
+  const loadQ=()=>{ const o=LS.get(QKEY,null); return (o&&Array.isArray(o.questions)&&o.questions.length)?o.questions:clone(DATA.questions); };
+  let Q=loadQ(), edited=!!(LS.get(QKEY,null)), draft=null;
+  const saveQ=()=>{ LS.set(QKEY,{questions:Q,ts:Date.now()}); edited=true; };
+  const FMQ=(DATA.fastMoney||[]).slice(0,5); while(FMQ.length<5) FMQ.push('Fast Money question '+(FMQ.length+1));
   const blankFM=()=>[0,1].map(()=>[0,1,2,3,4].map(()=>({a:'',p:'',ra:false,rp:false})));
   let G=LS.get('ff-host',null);
   if(!G){ G={teams:[{name:'Team 1',score:0},{name:'Team 2',score:0}],screen:'title',qi:0,revealed:[],unscored:[],bank:0,mult:1,strikes:0,strike:null,awarded:false,control:null,hideQ:false,showQR:true,
     buzz:{open:false,first:null,ts:0},fm:{rows:blankFM(),hideP1:false,timer:{running:false,left:0}},hostSound:false,players:{}}; }
-  G.code=FIXED_CODE; G.players=G.players||{}; G.strikesT=G.strikesT||[0,0]; G.buzz=G.buzz||{open:false,first:null,ts:0};
+  G.code=FIXED_CODE; G.qi=Math.max(0,Math.min(Q.length-1,G.qi||0)); G.players=G.players||{}; G.strikesT=G.strikesT||[0,0]; G.buzz=G.buzz||{open:false,first:null,ts:0};
   if(G.fm&&G.fm.timer) G.fm.timer.running=false;
   const conns=new Map();
   let peer=null, idTries=0;
@@ -613,8 +625,38 @@ function initHost(){
     fmInt=setInterval(()=>{ const n=Date.now(); G.fm.timer.left=Math.max(0,G.fm.timer.left-(n-last)/1000); last=n; if(G.fm.timer.left<=5&&G.fm.timer.left>0) sfx('tick'); if(G.fm.timer.left<=0){ G.fm.timer.running=false; clearInterval(fmInt); sfx('timeup'); } broadcast(); },1000); broadcast(); }
   function fmStop(){ clearInterval(fmInt); G.fm.timer.running=false; broadcast(); }
 
+  function saveDraft(){
+    if(!draft) return;
+    const qtext=draft.q.trim(); const ans=draft.a.filter(a=>String(a[0]).trim()).map(a=>[String(a[0]).trim(),Math.max(0,Math.min(100,parseInt(a[1])||0))]).sort((x,y)=>y[1]-x[1]).slice(0,8);
+    if(!qtext){ flash('Type the question first'); return; } if(!ans.length){ flash('Add at least one answer'); return; }
+    if(draft.isNew){ Q.splice(draft.idx,0,[qtext,ans]); saveQ(); draft=null; A.gotoQ(G.qi+1); flash('Question added'); return; }
+    const old=Q[draft.idx]; const wasRev=old[1].filter((a,i)=>G.revealed[i]).map(a=>a[0]), wasUns=old[1].filter((a,i)=>G.unscored[i]).map(a=>a[0]);
+    Q[draft.idx]=[qtext,ans];
+    if(draft.idx===G.qi){ G.revealed=ans.map(a=>wasRev.includes(a[0])); G.unscored=ans.map(a=>wasUns.includes(a[0])); }
+    saveQ(); draft=null; broadcast(); flash('Saved on this laptop');
+  }
+  function questionsFileText(){
+    return '// Edit your questions here, then commit. Format: ["Question", [["Answer", points], ...]]  (up to 8 answers, highest points first)\n'+
+      'window.FEUD_DATA = {\n title: '+JSON.stringify(DATA.title||'Family Feud')+',\n code: '+JSON.stringify(FIXED_CODE)+',\n questions: [\n'+
+      Q.map(q=>'  '+JSON.stringify(q)).join(',\n')+'\n ],\n // Fast Money: 5 questions. The host types the players\' answers and points live.\n fastMoney: [\n'+
+      (DATA.fastMoney||[]).map(x=>'  '+JSON.stringify(x)).join(',\n')+'\n ]\n};\n';
+  }
+  function showCopy(){
+    const txt=questionsFileText(); const md=document.createElement('div'); md.className='sndModal';
+    md.innerHTML='<div class="panel"><h3>Copy questions file <button class="hBtn" data-close="1">Close</button></h3>'+
+      '<div class="small" style="margin-bottom:8px">1. Click Copy. 2. Open questions.js on GitHub. 3. Select everything in the editor, paste, and click Commit changes. The site updates in about a minute.</div>'+
+      '<div class="row"><button class="hBtn gold" data-copy="1">Copy</button><a class="hBtn" href="https://github.com/TonyAnimadu/family-feud/edit/main/questions.js" target="_blank" rel="noopener">Open questions.js on GitHub</a><span class="small" id="cpMsg"></span></div>'+
+      '<textarea class="edQ" readonly rows="14" style="font-family:ui-monospace,monospace;font-size:12px"></textarea></div>';
+    $('textarea',md).value=txt;
+    md.addEventListener('click',ev=>{ if(ev.target.dataset.close||ev.target===md) md.remove();
+      if(ev.target.dataset.copy){ const ta=$('textarea',md); const done=()=>{ $('#cpMsg',md).textContent='Copied'; };
+        try{ navigator.clipboard.writeText(txt).then(done,()=>{ ta.select(); document.execCommand('copy'); done(); }); }catch(x){ ta.select(); try{document.execCommand('copy'); done();}catch(y){} } } });
+    document.body.appendChild(md);
+  }
+
   document.addEventListener('keydown',e=>{
     if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) return;
+    if(draft) return;
     const k=e.key.toLowerCase();
     if(k==='a') doBuzz({pid:'kbd-a',name:'',team:0});
     if(k==='l') doBuzz({pid:'kbd-l',name:'',team:1});
@@ -644,6 +686,10 @@ function initHost(){
       (pids.length? pids.map(pid=>{ const p=G.players[pid]; return '<div class="pRow"><span class="dot '+(onlinePids.has(pid)?'on':'')+'"></span><input data-f="pn'+pid+'" data-pn="'+pid+'" value="'+esc(p.name)+'" maxlength="16"><button class="tb '+(p.team?'t2':'')+'" data-a="pteam" data-v="'+pid+'">'+esc(G.teams[p.team].name)+'</button><button class="hBtn" data-a="pkick" data-v="'+pid+'" title="Remove">✕</button></div>'; }).join('')
         : '<div class="small">Nobody yet. Put the Title screen on the TV so people can scan the QR code.</div>')+
       '<div class="small" style="margin-top:10px">Tap a team button to move a player. ✕ removes them and sends them back to the join screen.</div></div>'+
+      '<div class="panel"><h3>Questions <span class="small">'+(edited?'Edited on this laptop':'Using the GitHub version')+'</span></h3>'+
+        '<div class="row"><button class="hBtn gold" data-a="qcopy">Copy questions file</button>'+(edited?'<button class="hBtn" data-a="qreset">Reset to GitHub version</button>':'')+'</div>'+
+        '<div class="small">'+(edited?'Your edits are saved in this browser only. To make them permanent, copy the file and paste it into questions.js on GitHub.':'Edit any question with ✎ Edit on the Answers panel.')+'</div></div>'+
+      '</div><div class="hGrid" style="margin-top:14px">'+
       '<div class="panel"><h3>Links and shortcuts</h3><div class="small">Site: <a href="'+esc(baseURL)+'" target="_blank" rel="noopener">'+esc(baseURL)+'</a></div><div class="small">Join link: '+esc(joinURL)+'</div><div class="small">TV link: '+esc(displayURL)+'</div>'+
       '<div class="small" style="margin-top:8px">Keyboard: <kbd>A</kbd> Team 1 buzz · <kbd>L</kbd> Team 2 buzz · <kbd>1</kbd>–<kbd>8</kbd> flip · <kbd>X</kbd> strike for the team in control</div></div></div>'+
     '<div class="panel" style="margin-top:14px"><h3>Custom sounds</h3>'+soundPanelHTML()+'</div>';
@@ -654,6 +700,7 @@ function initHost(){
     return '<div class="hGrid"><div class="panel"><h3>Round '+(G.qi+1)+' of '+Q.length+'</h3>'+
       '<div class="row"><button class="hBtn" data-a="prev">◀ Prev</button><select class="qSel" data-a2="jump">'+Q.map((x,i)=>'<option value="'+i+'" '+(i===G.qi?'selected':'')+'>'+(i+1)+'. '+esc(x[0].replace(/^Name /,'').slice(0,60))+'</option>').join('')+'</select><button class="hBtn gold" data-a="next">Next ▶</button></div>'+
       '<div class="qText">'+esc(q[0])+'</div>'+
+      '<div class="row"><button class="hBtn" data-a="qnew">＋ New question after this</button><button class="hBtn" data-a="qdel">Delete this question</button></div>'+
       '<div class="row"><span class="bankLine">BANK <span>'+G.bank+'</span></span><span style="flex:1"></span>'+[1,2,3].map(m=>'<button class="hBtn '+(G.mult===m?'sel':'')+'" data-a="mult" data-v="'+m+'">x'+m+'</button>').join('')+'</div>'+
       [0,1].map(t=>'<div class="row strikeTeam"><button class="hBtn red" data-a="strike" data-v="'+t+'">✕ Wrong: '+esc(G.teams[t].name)+'</button><div class="strikeDots">'+[1,2,3].map(i=>'<i class="'+(G.strikesT[t]>=i?'on':'')+'">X</i>').join('')+'</div></div>').join('')+
       '<div class="row"><button class="hBtn" data-a="onex">Single X (face-off)</button><button class="hBtn" data-a="clearx">Clear strikes</button></div>'+
@@ -662,10 +709,20 @@ function initHost(){
       '<div class="buzzInfo '+(B.first?'hit':B.open?'open':'')+'">'+(B.first?esc((B.first.name?B.first.name+' · ':'')+G.teams[B.first.team].name)+' buzzed first':B.open?'Buzzers open, waiting…':'Buzzers locked')+'</div>'+
       '<div class="row" style="margin-top:10px"><button class="hBtn gold" data-a="openbuzz">Open buzzers</button><button class="hBtn" data-a="lockbuzz">Lock</button><button class="hBtn" data-a="resetbuzz">Reset</button></div>'+
       '<div class="small">Opening the buzzers clears the last buzz.</div>'+
-    '</div><div class="panel"><h3>Answers <span class="small">Flip turns the tile on the TV</span></h3><div class="ansList">'+
+    '</div><div class="panel">'+(draft? editorHTML() :
+      '<h3>Answers <span style="display:flex;gap:8px;align-items:center"><span class="small">Flip turns the tile on the TV</span><button class="hBtn" data-a="qedit">✎ Edit</button></span></h3><div class="ansList">'+
       q[1].slice(0,8).map((a,i)=>'<div class="ansItem '+(G.revealed[i]?'done':'')+'"><span class="n">'+(i+1)+'</span><span class="t">'+esc(a[0])+'</span><span class="p">'+a[1]+'</span>'+
         (G.revealed[i]?'<button class="hBtn" data-a="hide" data-v="'+i+'">Hide</button>':'<button class="hBtn gold" data-a="reveal" data-v="'+i+'">Flip</button>')+'</div>').join('')+
-      '</div><div class="small" style="margin-top:10px">Flips add points to the bank. After you award the bank, more flips show grayed out with no points.</div></div></div>';
+      '</div><div class="small" style="margin-top:10px">Flips add points to the bank. After you award the bank, more flips show grayed out with no points.</div>')+'</div></div>';
+  }
+  function editorHTML(){
+    const tot=draft.a.reduce((s,a)=>s+(parseInt(a[1])||0),0);
+    return '<h3>'+(draft.isNew?'New question':'Edit question')+' <span class="small">Saved on this laptop</span></h3>'+
+      '<div class="small" style="margin-bottom:6px">Question</div><textarea class="edQ" data-f="dq" data-dq="1" rows="2" placeholder="Name something…">'+esc(draft.q)+'</textarea>'+
+      '<div class="small" style="margin:10px 0 6px">Answers and points (up to 8). They sort highest first when you save.</div>'+
+      draft.a.map((a,i)=>'<div class="edRow"><span class="n">'+(i+1)+'</span><input data-f="da'+i+'" data-da="'+i+'" value="'+esc(a[0])+'" placeholder="Answer"><input type="number" min="0" max="100" data-f="dp'+i+'" data-dp="'+i+'" value="'+esc(a[1])+'" placeholder="pts"><button class="hBtn" data-a="edrm" data-v="'+i+'" title="Remove">✕</button></div>').join('')+
+      '<div class="row" style="margin-top:8px">'+(draft.a.length<8?'<button class="hBtn" data-a="edadd">＋ Add answer</button>':'')+'<span class="small" id="edTot">Total: '+tot+' points</span></div>'+
+      '<div class="row"><button class="hBtn gold" data-a="edsave">Save</button><button class="hBtn" data-a="edcancel">Cancel</button></div>';
   }
   function fmPanel(){
     const F=G.fm;
@@ -697,6 +754,15 @@ function initHost(){
       case 'copyjoin': try{ navigator.clipboard.writeText(baseURL+'?join='+G.code).then(()=>flash('Join link copied')); }catch(x){ flash(baseURL+'?join='+G.code); } break;
       case 'pteam': { const p=G.players[v]; if(!p) break; p.team=p.team?0:1; save(); tellPlayer(v); render(); break; }
       case 'pkick': { if(!askConfirm('kick'+v)) break; tellPlayer(v,{joined:false}); delete G.players[v]; save(); render(); break; }
+      case 'qedit': { const cq=Q[G.qi]; draft={idx:G.qi,isNew:false,q:cq[0],a:cq[1].map(a=>[a[0],a[1]])}; render(); break; }
+      case 'qnew': draft={idx:G.qi+1,isNew:true,q:'',a:[['',''],['',''],['',''],['',''],['',''],['','']]}; if(G.screen!=='board'){ G.screen='board'; broadcast(); } else render(); break;
+      case 'edadd': if(draft&&draft.a.length<8){ draft.a.push(['','']); render(); } break;
+      case 'edrm': if(draft){ draft.a.splice(+v,1); if(!draft.a.length) draft.a.push(['','']); render(); } break;
+      case 'edcancel': draft=null; render(); break;
+      case 'edsave': saveDraft(); break;
+      case 'qdel': { if(Q.length<=1){ flash('You need at least one question'); break; } if(!askConfirm('qdel')) break; Q.splice(G.qi,1); saveQ(); draft=null; A.gotoQ(Math.min(G.qi,Q.length-1)); flash('Question deleted'); break; }
+      case 'qreset': { if(!askConfirm('qreset')) break; try{localStorage.removeItem(QKEY)}catch(x){} Q=clone(DATA.questions); edited=false; draft=null; A.gotoQ(Math.min(G.qi,Q.length-1)); flash('Back to the GitHub version'); break; }
+      case 'qcopy': showCopy(); break;
       case 'fmt': fmStart(+v); break; case 'fmstop': fmStop(); break;
       case 'fmhide': G.fm.hideP1=!G.fm.hideP1; broadcast(); break;
       case 'fmdup': sfx('zero'); break;
@@ -713,6 +779,7 @@ function initHost(){
   });
   root.addEventListener('input',e=>{
     const t=e.target;
+    if(draft){ if(t.dataset.dq){ draft.q=t.value; return; } if(t.dataset.da!=null){ draft.a[+t.dataset.da][0]=t.value; return; } if(t.dataset.dp!=null){ draft.a[+t.dataset.dp][1]=t.value; const el=$('#edTot'); if(el) el.textContent='Total: '+draft.a.reduce((s,a)=>s+(parseInt(a[1])||0),0)+' points'; return; } }
     if(t.dataset.fa){ const [p,r]=t.dataset.fa.split(',').map(Number); G.fm.rows[p][r].a=t.value; save(); if(G.fm.rows[p][r].ra) broadcastQuiet(); }
     if(t.dataset.fp){ const [p,r]=t.dataset.fp.split(',').map(Number); G.fm.rows[p][r].p=t.value; save(); if(G.fm.rows[p][r].rp) broadcastQuiet(); }
   });
