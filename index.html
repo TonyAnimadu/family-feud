@@ -219,6 +219,8 @@ body.phone .stage{--rayY:58%}
 .flowMsg{font-size:16px;line-height:1.4;margin-bottom:12px}
 .flow .row:last-child{margin-bottom:0}
 .hBtn.big{padding:12px 18px;font-size:15px}
+.rules{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:7px;font-size:14px;line-height:1.45;color:#dbe4fb}
+.rules li::marker{color:var(--gold-hi);font-family:var(--ffh);font-weight:800}
 .hTeam .row{margin:0}
 .ansList{display:flex;flex-direction:column;gap:8px}
 .ansItem{display:flex;align-items:center;gap:10px;background:#0a1a44;border-radius:12px;padding:10px 12px;border:1px solid var(--line)}
@@ -863,7 +865,19 @@ function initHost(){
         '<div class="small">'+(edited?'Your edits are saved in this browser only. To make them permanent, copy the file and paste it into questions.js on GitHub.':'Edit any question with ✎ Edit on the Answers panel.')+'</div></div>'+
       '</div><div class="hGrid" style="margin-top:14px">'+
       '<div class="panel"><h3>Links and shortcuts</h3><div class="small">Site: <a href="'+esc(baseURL)+'" target="_blank" rel="noopener">'+esc(baseURL)+'</a></div><div class="small">Join link: '+esc(joinURL)+'</div><div class="small">TV link: '+esc(displayURL)+'</div>'+
-      '<div class="small" style="margin-top:8px">Keyboard: <kbd>A</kbd> Team 1 buzz · <kbd>L</kbd> Team 2 buzz · <kbd>1</kbd>–<kbd>8</kbd> flip · <kbd>X</kbd> wrong answer (works in every phase)</div></div></div>'+
+      '<div class="small" style="margin-top:8px">Keyboard: <kbd>A</kbd> Team 1 buzz · <kbd>L</kbd> Team 2 buzz · <kbd>1</kbd>–<kbd>8</kbd> flip · <kbd>X</kbd> wrong answer (works in every phase)</div></div>'+
+      '<div class="panel"><h3>How to play</h3><ol class="rules">'+
+        '<li>Split into two teams. Each team sends one player up for the face-off.</li>'+
+        '<li>The host reads the question. The first player to buzz in answers.</li>'+
+        '<li>If it\'s the top answer, their team wins the face-off. If not, the other player answers, and the higher answer wins.</li>'+
+        '<li>The face-off winner chooses to play the board or pass it to the other team.</li>'+
+        '<li>The playing team gives answers one player at a time. Every correct answer adds its points to the bank.</li>'+
+        '<li>A wrong answer is a strike. After three strikes, the other team huddles and gets one guess to steal.</li>'+
+        '<li>A correct steal wins the whole bank. If the steal fails, the playing team keeps it.</li>'+
+        '<li>Clearing the board before three strikes wins the bank for the playing team.</li>'+
+        '<li>Later rounds are worth double or triple points. The team with the most points at the end wins.</li>'+
+        '<li>In Fast Money, two players from the winning team answer the same five questions. The first gets 20 seconds and the second gets 25. A repeated answer means try again. 200 combined points wins.</li>'+
+      '</ol></div></div>'+
     '<div class="panel" style="margin-top:14px"><h3>Custom sounds</h3>'+soundPanelHTML()+'</div>';
     setNet(); showFlash();
     if(numEdit){ const el=root.querySelector('[data-num]'); if(el){ el.focus(); if(numEdit.fresh){ el.select(); numEdit.fresh=false; } else { try{ const v=el.value; el.setSelectionRange(v.length,v.length);}catch(e){} } numPreview(); } }
