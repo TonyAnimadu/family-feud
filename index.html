@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:ital,wght@0,500;0,600;0,700;0,800;0,900;1,900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script src="questions.js?v=10"></script>
+<script src="questions.js?v=11"></script>
 <style>
 /* ---------- palette: navy base, royal blue tiles, warm gold accent (complement), team blue vs coral ---------- */
 :root{
@@ -624,7 +624,7 @@ function initHost(){
     lockBuzz(){ G.buzz.open=false; broadcast(); },
     resetBuzz(){ G.buzz={open:false,first:null,ts:0}; broadcast(); },
     score(t,d){ G.teams[t].score=Math.max(0,G.teams[t].score+d); broadcast(); },
-    newGame(){ if(!askConfirm('newgame')) return; G.teams.forEach(t=>t.score=0); G.fm={rows:blankFM(),hideP1:false,timer:{running:false,left:0}}; A.gotoQ(0); G.screen='title'; broadcast(); },
+    newGame(){ if(!askConfirm('newgame')) return; G.teams.forEach(t=>t.score=0); G.mult=1; G.strikesT=[0,0]; G.hideQ=false; G.fm={rows:blankFM(),hideP1:false,timer:{running:false,left:0}}; A.gotoQ(0); G.screen='title'; broadcast(); },
   };
   let confirmKey=null, confirmT=0;
   function askConfirm(k){ if(confirmKey===k&&Date.now()-confirmT<4000){ confirmKey=null; return true; } confirmKey=k; confirmT=Date.now(); flash('Press again to confirm'); return false; }
