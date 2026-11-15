@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:ital,wght@0,500;0,600;0,700;0,800;0,900;1,900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script src="questions.js?v=6"></script>
+<script src="questions.js?v=7"></script>
 <style>
 /* ---------- palette: navy base, royal blue tiles, warm gold accent (complement), team blue vs coral ---------- */
 :root{
@@ -405,7 +405,7 @@ function initDisplay(code){
   $('#dSnd').onclick=e=>{ e.stopPropagation(); const m=document.createElement('div'); m.className='sndModal';
     const draw=()=>{ m.innerHTML='<div class="panel"><h3>Custom sounds <button class="hBtn" data-close="1">Close</button></h3>'+soundPanelHTML()+'</div>'; };
     draw(); wireSoundPanel(m,draw); m.addEventListener('click',ev=>{ ev.stopPropagation(); if(ev.target.dataset.close) m.remove(); }); document.body.appendChild(m); };
-  $('#dStart').onclick=()=>{ SFX.unlock(); audioOn=true; $('#dStart').remove(); try{document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}catch(e){} };
+  $('#dStart').onclick=()=>{ SFX.unlock(); audioOn=true; $('#dStart').remove(); try{ const p=document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen(); if(p&&p.catch) p.catch(()=>{}); }catch(e){} };
   connectClient(code,()=>({t:'hello',role:'display'}),msg=>{
     if(msg.t==='state'){ S=msg.s; if(!primed){ primed=true; prevStrikeTs=S.strike?S.strike.ts:0; prevBuzzTs=S.buzz&&S.buzz.first?S.buzz.ts:0; } render(); }
     if(msg.t==='sfx' && audioOn) SFX.play(msg.n);
