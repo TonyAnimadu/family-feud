@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:ital,wght@0,500;0,600;0,700;0,800;0,900;1,900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script src="questions.js?v=9"></script>
+<script src="questions.js?v=10"></script>
 <style>
 /* ---------- palette: navy base, royal blue tiles, warm gold accent (complement), team blue vs coral ---------- */
 :root{
@@ -355,10 +355,11 @@ function peerOpts(){ return {debug:0, config:{iceServers:[{urls:'stun:stun.l.goo
 
 /* client connection with auto-reconnect */
 function connectClient(code, hello, onMsg, onStatus){
-  let peer=null, conn=null, dead=false, timer=null;
+  let peer=null, conn=null, dead=false, timer=null, watch=null;
   function start(){
     onStatus('connecting');
     if(peer){ try{peer.destroy()}catch(e){} }
+    clearTimeout(watch); watch=setTimeout(()=>{ if(!conn||!conn.open) start(); },12000);
     peer=new Peer(undefined, peerOpts());
     peer.on('open',()=>{
       conn=peer.connect(PREFIX+code,{reliable:true});
@@ -414,10 +415,17 @@ function initDisplay(code){
     const draw=()=>{ m.innerHTML='<div class="panel"><h3>Custom sounds <button class="hBtn" data-close="1">Close</button></h3>'+soundPanelHTML()+'</div>'; };
     draw(); wireSoundPanel(m,draw); m.addEventListener('click',ev=>{ ev.stopPropagation(); if(ev.target.dataset.close) m.remove(); }); document.body.appendChild(m); };
   $('#dStart').onclick=()=>{ SFX.unlock(); audioOn=true; $('#dStart').remove(); try{ const p=document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen(); if(p&&p.catch) p.catch(()=>{}); }catch(e){} };
-  connectClient(code,()=>({t:'hello',role:'display'}),msg=>{
+  const seenSfx=[]; let netSt='connecting', lastLocal=0;
+  const onMsg=msg=>{
     if(msg.t==='state'){ S=msg.s; if(!primed){ primed=true; prevStrikeTs=S.strike?S.strike.ts:0; prevBuzzTs=S.buzz&&S.buzz.first?S.buzz.ts:0; } render(); }
-    if(msg.t==='sfx' && audioOn) SFX.play(msg.n);
-  },st=>{ const d=$('#dConn'); d.textContent= st==='connected'?'● live':st==='nohost'?'waiting for host…':'reconnecting…'; d.style.color=st==='connected'?'#5fe39b':'#ffb3b3'; });
+    if(msg.t==='sfx'){ if(msg.id){ if(seenSfx.includes(msg.id)) return; seenSfx.push(msg.id); if(seenSfx.length>60) seenSfx.shift(); } if(audioOn) SFX.play(msg.n); }
+  };
+  const showConn=()=>{ const d=$('#dConn'); if(!d) return; const local=Date.now()-lastLocal<9000;
+    d.textContent= netSt==='connected'?'● live':local?'● live (this laptop)':netSt==='nohost'?'waiting for host…':'reconnecting…';
+    d.style.color=(netSt==='connected'||local)?'#5fe39b':'#ffb3b3'; };
+  const bcLive=('BroadcastChannel' in window)?new BroadcastChannel('ff-live-'+code):null;
+  if(bcLive){ bcLive.onmessage=e=>{ lastLocal=Date.now(); onMsg(e.data||{}); showConn(); }; const hi=()=>{ try{bcLive.postMessage({t:'hello',role:'display'})}catch(x){} }; hi(); setInterval(()=>{ hi(); showConn(); },3000); }
+  connectClient(code,()=>({t:'hello',role:'display'}),onMsg,st=>{ netSt=st; showConn(); });
 
   function render(){
     if(!S) return;
@@ -560,10 +568,12 @@ function initHost(){
       round:{qi:G.qi,total:Q.length,q:q[0],hideQ:G.hideQ,bank:G.bank,mult:G.mult,strikes:G.strikes,slots:q[1].slice(0,8).map((a,i)=>G.revealed[i]?{r:true,a:a[0],p:a[1],u:!!G.unscored[i]}:{r:false})},
       fm:{hideP1:G.fm.hideP1,total:fmTotal(),timer:G.fm.timer,rows:G.fm.rows.map(r=>r.map(c=>({ra:c.ra,rp:c.rp,a:c.ra?c.a:'',p:c.rp?(+c.p||0):''})))}};
   }
-  const sendAll=m=>conns.forEach(c=>{ if(c.conn.open) try{c.conn.send(m)}catch(e){} });
+  const bcLive=('BroadcastChannel' in window)?new BroadcastChannel('ff-live-'+G.code):null; let localTV=0, sfxSeq=0;
+  if(bcLive) bcLive.onmessage=e=>{ const d=e.data||{}; if(d.t==='hello'&&d.role==='display'){ const was=Date.now()-localTV<9000; localTV=Date.now(); try{bcLive.postMessage({t:'state',s:pub()})}catch(x){} if(!was) render(); } };
+  const sendAll=m=>{ conns.forEach(c=>{ if(c.conn.open) try{c.conn.send(m)}catch(e){} }); if(bcLive) try{bcLive.postMessage(m)}catch(e){} };
   function broadcast(){ save(); sendAll({t:'state',s:pub()}); render(); }
   function broadcastQuiet(){ save(); sendAll({t:'state',s:pub()}); }
-  function sfx(n){ conns.forEach(c=>{ if(c.conn.open&&c.role==='display') try{c.conn.send({t:'sfx',n})}catch(e){} }); if(G.hostSound) SFX.play(n); }
+  function sfx(n){ const msg={t:'sfx',n,id:Date.now()+'-'+(++sfxSeq)}; conns.forEach(c=>{ if(c.conn.open&&c.role==='display') try{c.conn.send(msg)}catch(e){} }); if(bcLive) try{bcLive.postMessage(msg)}catch(e){} if(G.hostSound) SFX.play(n); }
   function tellPlayer(pid,extra){ const p=G.players[pid]; conns.forEach(c=>{ if(c.pid===pid&&c.conn.open){ c.name=p.name; c.team=p.team; try{c.conn.send(Object.assign({t:'you',name:p.name,team:p.team},extra||{}))}catch(e){} } }); }
 
   function startPeer(){
@@ -577,7 +587,7 @@ function initHost(){
       conn.on('close',()=>{ conns.delete(conn.peer); render(); });
       conn.on('error',()=>{ conns.delete(conn.peer); render(); });
     });
-    peer.on('disconnected',()=>{ setNet('Reconnecting…'); try{peer.reconnect()}catch(e){} });
+    peer.on('disconnected',()=>{ setNet('Reconnecting…'); try{peer.reconnect()}catch(e){} const p=peer; setTimeout(()=>{ if(p===peer&&!peer.open) startPeer(); },7000); });
     peer.on('error',e=>{
       if(e.type==='unavailable-id'){ idTries++; setNet('Code '+G.code+' is busy. Close any other host tab. Retrying…'); setTimeout(startPeer,idTries<3?3000:6000); }
       else { setNet('Connection issue, retrying…'); setTimeout(()=>{ if(peer.destroyed||peer.disconnected) startPeer(); },3000); }
@@ -667,7 +677,7 @@ function initHost(){
   function render(){
     const q=Q[G.qi]||['',[]];
     const displayURL=baseURL+'?display='+G.code, joinURL=baseURL+'?join='+G.code;
-    const live=[...conns.values()], displays=live.filter(c=>c.role==='display'), onlinePids=new Set(live.filter(c=>c.role==='player').map(c=>c.pid));
+    const live=[...conns.values()], displays=live.filter(c=>c.role==='display').concat(Date.now()-localTV<9000?[{local:true}]:[]), onlinePids=new Set(live.filter(c=>c.role==='player').map(c=>c.pid));
     const focus=document.activeElement&&document.activeElement.dataset?document.activeElement.dataset.f:null;
     const pids=Object.keys(G.players);
     root.innerHTML=
@@ -784,6 +794,8 @@ function initHost(){
     if(t.dataset.fp){ const [p,r]=t.dataset.fp.split(',').map(Number); G.fm.rows[p][r].p=t.value; save(); if(G.fm.rows[p][r].rp) broadcastQuiet(); }
   });
   setInterval(()=>sendAll({t:'state',s:pub()}),4000);
+  setInterval(()=>{ if(peer&&(peer.destroyed||(peer.disconnected&&!peer.open))) startPeer(); },15000);
+  setInterval(()=>{ if(localTV&&Date.now()-localTV>9000){ localTV=0; render(); } },5000);
   wireSoundPanel(root,()=>render()); SoundStore.onchange=()=>render();
   render(); startPeer();
 }
